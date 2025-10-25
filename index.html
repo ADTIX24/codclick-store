@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CODCLICK</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Hide scrollbar for Webkit-based browsers (Chrome, Safari) */
+      ::-webkit-scrollbar {
+        display: none;
+      }
+      body {
+        font-family: 'Cairo', sans-serif; /* A good font for Arabic */
+        /* Hide scrollbar for IE, Edge and Firefox */
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+        background-color: #0f172a; /* bg-slate-900 fallback */
+        position: relative;
+        overflow-x: hidden;
+      }
+
+      /* Animated icons background */
+      @keyframes move-icons {
+        0% {
+          background-position: 0 0;
+        }
+        100% {
+          background-position: -400px -400px;
+        }
+      }
+
+      /* Floating animations for App Promotion section */
+      @keyframes float-slow {
+          0%, 100% { transform: translateY(0) rotate(-12deg); }
+          50% { transform: translateY(-20px) rotate(-10deg); }
+      }
+      @keyframes float-fast {
+          0%, 100% { transform: translateY(0) rotate(15deg); }
+          50% { transform: translateY(-15px) rotate(18deg); }
+      }
+      
+      /* Why Choose Us section animations */
+      @keyframes spin-slow {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      @keyframes pulse-ring {
+        0% { transform: scale(0.8); opacity: 0.5; }
+        50% { transform: scale(1.2); opacity: 0.7; }
+        100% { transform: scale(0.8); opacity: 0.5; }
+      }
+
+      .animate-float-slow {
+          animation: float-slow 6s ease-in-out infinite;
+      }
+      .animate-float-fast {
+          animation: float-fast 4s ease-in-out infinite;
+      }
+
+      .bg-dots {
+          background-image: radial-gradient(rgba(251, 191, 36, 0.1) 1px, transparent 1px);
+          background-size: 10px 10px;
+      }
+      
+      .animate-spin-slow {
+        animation: spin-slow 20s linear infinite;
+      }
+      .animate-pulse-ring {
+        animation: pulse-ring 8s ease-in-out infinite;
+      }
+
+      body::before,
+      body::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 0;
+        will-change: background-position;
+      }
+
+      body::before {
+        background-image: url("data:image/svg+xml,%3csvg width='400' height='400' xmlns='http://www.w3.org/2000/svg'%3e%3cg fill='rgba(251, 191, 36, 0.08)' fill-rule='evenodd'%3e%3cg transform='translate(40 40) scale(1.5)'%3e%3cpath d='M17.2 18c.6-.8 1-1.8 1-2.9 0-1.2-.4-2.3-1.1-3.2-.8-.8-1.8-1.3-2.9-1.3-1.3 0-2.5.7-3.4 1.6-.8-1-2-1.6-3.3-1.6-1.4 0-2.7.7-3.5 1.9-.8 1.1-1.2 2.5-1.2 3.8 0 2.9 1.6 5.4 3.9 7.3.9.8 1.9 1.6 3.1 1.6s2.1-.7 2.9-1.5c.3-.3.6-.6.8-.9.5-.6.9-1.2 1.5-1.2s.9.4 1.4 1.1z'/%3e%3c/g%3e%3cg transform='translate(200 150) scale(1.5) rotate(15)'%3e%3cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 16.93c-3.95-.49-7-3.85-7-7.93 0-1.57.46-3.03 1.25-4.25L12 17.42V18.93zM13 18.93V17.42L18.75 4.82c.79 1.22 1.25 2.68 1.25 4.25 0 4.08-3.05 7.44-7 7.93z'/%3e%3c/g%3e%3cg transform='translate(300 280) scale(1.5) rotate(20)'%3e%3cpath d='M22.46 6c-.77.35-1.6.58-2.46.67.88-.53 1.56-1.37 1.88-2.38-.83.49-1.75.85-2.72 1.05C18.37 4.5 17.26 4 16 4c-2.35 0-4.27 1.92-4.27 4.29 0 .34.04.67.11.98C8.29 9.09 5.11 7.23 2.94 4.48c-.37.63-.58 1.37-.58 2.15 0 1.49.76 2.81 1.91 3.58-.7-.02-1.36-.21-1.94-.54v.05c0 2.08 1.48 3.82 3.44 4.21-.36.1-.74.15-1.14.15-.28 0-.55-.03-.81-.08.55 1.7 2.14 2.94 4.03 2.97C6.5 19.38 4.65 20.06 2.66 20.06c-.35 0-.69-.02-1.03-.06 1.9 1.22 4.16 1.93 6.56 1.93 7.88 0 12.2-6.54 12.2-12.2 0-.19 0-.37-.01-.56.84-.6 1.56-1.36 2.14-2.22z'/%3e%3c/g%3e%3cg transform='translate(150 20) scale(1.2) rotate(-15)'%3e%3cpath d='M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.85s-.011 3.585-.069 4.85c-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07s-3.585-.012-4.85-.07c-3.252-.148-4.771-1.691-4.919-4.919-.058-1.265-.069-1.645-.069-4.85s.011-3.585.069-4.85c.149-3.225 1.664 4.771 4.919 4.919C8.415 2.175 8.796 2.163 12 2.163zm0 1.441c-3.171 0-3.543.012-4.785.069-2.695.123-3.875 1.318-3.998 3.998-.056 1.24-.067 1.61-.067 4.785s.011 3.546.067 4.785c.123 2.68 1.303 3.875 3.998 3.998 1.242.056 1.613.067 4.785.067s3.543-.011 4.785-.067c2.695-.123 3.875-1.318 3.998-3.998.056-1.24.067-1.61.067-4.785s-.011-3.546-.067-4.785c-.123-2.68-1.303-3.875-3.998-3.998C15.543 3.614 15.171 3.604 12 3.604zm0 2.446c-3.033 0-5.5 2.467-5.5 5.5s2.467 5.5 5.5 5.5 5.5-2.467 5.5-5.5-2.467-5.5-5.5-5.5zm0 9.083c-1.98 0-3.583-1.603-3.583-3.583s1.603-3.583 3.583-3.583 3.583 1.603 3.583 3.583-1.603 3.583-3.583 3.583zm4.965-9.333c-.78 0-1.416.636-1.416 1.416s.636 1.416 1.416 1.416 1.416-.636 1.416-1.416-.636-1.416-1.416-1.416z' clip-rule='evenodd'/%3e%3c/g%3e%3cg transform='translate(350 100) scale(1.3) rotate(10)'%3e%3cpath d='M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.79.46 3.49 1.32 4.95L2 22l5.25-1.38c1.41.79 3.05 1.22 4.79 1.22h.01c5.46 0 9.9-4.44 9.91-9.9C21.95 6.45 17.5 2 12.04 2zM16.53 13.96c-.2-.09-1.17-.58-1.35-.64s-.32-.09-.45.09c-.13.18-.51.64-.62.77s-.23.15-.42.06c-.19-.09-1.25-.46-2.38-1.47s-1.74-2.22-1.93-2.58c-.19-.37-.02-.57.08-.69.09-.1.2-.26.3-.39.09-.13.13-.21.2-.35.06-.13 0-.26-.04-.35-.04-.09-.45-1.08-.62-1.47-.16-.38-.32-.33-.45-.33h-.27c-.13 0-.32.04-.48.18s-.62.6-.62 1.44c0 .84.65 1.68.75 1.81s1.24 2.18 3.01 2.96c1.77.78 2.23.83 2.64.79.41-.04 1.17-.48 1.34-.94s.16-.88.11-1.04c-.05-.13-.19-.21-.39-.3z'/%3e%3c/g%3e%3cg transform='translate(50 320) scale(1.4) rotate(-5)'%3e%3cpath d='M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zM10.5 6.5h3v2.25h2v3h-2V14h-3v-2.25h-2v-3h2V6.5z'/%3e%3c/g%3e%3c/g%3e%3c/svg%3e");
+        background-size: 400px 400px;
+        animation: move-icons 40s linear infinite;
+      }
+
+      body::after {
+        background-image: url("data:image/svg+xml,%3csvg width='400' height='400' xmlns='http://www.w3.org/2000/svg'%3e%3cg fill='rgba(251, 191, 36, 0.06)' fill-rule='evenodd'%3e%3cg transform='translate(80 200) scale(2) rotate(-30)'%3e%3cpath d='M3 2v20l18-10L3 2z'/%3e%3c/g%3e%3cg transform='translate(280 80) scale(1.2)'%3e%3cpath d='M13.5 22V12.5h3.3l.5-3.8h-3.8V6.4c0-1.1.3-1.8 1.9-1.8h2V1.1c-.3 0-1.5-.1-2.8-.1-2.8 0-4.7 1.7-4.7 4.8V8.7H7v3.8h3.5V22h4z'/%3e%3c/g%3e%3cg transform='translate(150 350) scale(1.2) rotate(45)'%3e%3cpath d='M21.582,6.186c-0.23-0.86-0.908-1.538-1.768-1.768C18.219,4,12,4,12,4S5.781,4,4.186,4.418 c-0.86,0.23-1.538,0.908-1.768,1.768C2,7.781,2,12,2,12s0,4.219,0.418,5.814c0.23,0.86,0.908,1.538,1.768,1.768 C5.781,20,12,20,12,20s6.219,0,7.814-0.418c0.861-0.23,1.538-0.908,1.768-1.768C22,16.219,22,12,22,12S22,7.781,21.582,6.186z M9.545,15.568V8.432L15.818,12L9.545,15.568z'/%3e%3c/g%3e%3cg transform='translate(10 10) scale(1.3) rotate(10)'%3e%3cpath d='M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.38 1.92-3.54 2.96-5.94 3.02h-1.16v-4.28c.96-.06 1.9-.34 2.76-.86.86-.52 1.46-1.32 1.82-2.26.08-1.52.09-3.07.06-4.6-.2-1.79-1.17-3.35-2.6-4.56-1.29-1.08-2.82-1.7-4.4-1.9V2.35c.66.01 1.32.02 1.98.03.01 1.22.48 2.42 1.32 3.31.81.86 1.9 1.31 3.01 1.4v-4.48c-.1-.01-.19-.02-.28-.02z'/%3e%3c/g%3e%3cg transform='translate(350 200) scale(1.5) rotate(-25)'%3e%3cpath d='M12 2c-2.4 0-4.4 2.1-4.4 4.8 0 1.2.4 2.3 1.2 3.2L12 22l3.2-12c.8-.9 1.2-2 1.2-3.2C16.4 4.1 14.4 2 12 2z'/%3e%3c/g%3e%3c/g%3e%3c/svg%3e");
+        background-size: 400px 400px;
+        animation: move-icons 60s linear infinite reverse;
+      }
+      
+      #root {
+        position: relative;
+        z-index: 1;
+        background-color: transparent;
+      }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.75.1"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-slate-900">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
