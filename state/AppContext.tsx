@@ -173,7 +173,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             description,
             rating,
             delivery_type,
-            delivery_content
+            delivery_content,
+            created_at
           )
         `).order('created_at', { ascending: true });
       if (categoriesError) throw categoriesError;
@@ -265,7 +266,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 description: 'This product could not be found.', 
                 rating: 0, 
                 delivery_type: 'code', 
-                delivery_content: ''
+                delivery_content: '',
+                created_at: new Date(0).toISOString(),
             }
           };
         }) : [];

@@ -17,7 +17,9 @@ const NewProducts: React.FC<NewProductsProps> = ({ title, subtitle, onViewAll, o
   const { categories } = state;
 
   const allProducts: Product[] = categories.flatMap(cat => cat.products);
-  const newProducts = allProducts.slice(-8).reverse(); // Example: get last 8 products
+  const newProducts = allProducts
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 8);
 
   return (
     <section className="py-16 sm:py-20 bg-transparent">

@@ -10,6 +10,7 @@ export interface Product {
   rating: number;
   delivery_type: 'code' | 'image' | 'pdf' | 'excel' | 'word' | 'video' | 'audio';
   delivery_content: string | string[];
+  created_at: string;
 }
 
 export interface Category {

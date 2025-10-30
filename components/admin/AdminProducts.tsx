@@ -131,6 +131,8 @@ const AdminProducts: React.FC = () => {
                     rating: parseFloat(values.rating as string),
                     delivery_type: deliveryType,
                     delivery_content: finalDeliveryContent,
+// FIX: Add missing 'created_at' property to satisfy the Product type.
+                    created_at: (modalState.data as Product)?.created_at || new Date().toISOString(),
                 };
 
                 if (modalState.mode === 'addProduct') {
