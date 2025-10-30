@@ -248,15 +248,17 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
                         <div>
                            <h3 className="font-semibold mb-3">{t('checkout.payment_method')}</h3>
                            <div className="space-y-3">
-                                {availableMethods.map(method => (
-                                   <div key={method.id}>
-                                       <PaymentOption method={method} selected={selectedMethodId === method.id} onChange={setSelectedMethodId} />
-                                       {/* FIX: Hide expansion panel for WhatsApp as it's not needed */}
-                                       <div className={`overflow-hidden transition-all duration-300 ease-in-out ${selectedMethodId === method.id && method.fields.length > 0 && method.icon !== 'whatsapp' ? 'max-h-96' : 'max-h-0'}`}>
-                                            {selectedMethodId === method.id && method.fields.length > 0 && renderExpansionPanel(method)}
+                                {availableMethods.map(method => {
+                                   const shouldShowPanel = selectedMethodId === method.id && ((method.instructions && method.instructions.trim() !== '') || method.fields.length > 0);
+                                   return (
+                                       <div key={method.id}>
+                                           <PaymentOption method={method} selected={selectedMethodId === method.id} onChange={setSelectedMethodId} />
+                                           <div className={`overflow-hidden transition-all duration-300 ease-in-out ${shouldShowPanel ? 'max-h-96' : 'max-h-0'}`}>
+                                                {shouldShowPanel && renderExpansionPanel(method)}
+                                           </div>
                                        </div>
-                                   </div>
-                                ))}
+                                   )
+                                })}
                            </div>
                         </div>
 

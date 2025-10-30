@@ -141,7 +141,12 @@ const initialAppState: AppState = {
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AppState>(() => {
-    const savedCart = localStorage.getItem('cart');
+    let savedCart = null;
+    try {
+      savedCart = localStorage.getItem('cart');
+    } catch (e) {
+      console.warn('Could not access localStorage to get cart:', e);
+    }
     return {
       ...initialAppState,
       cart: savedCart ? JSON.parse(savedCart) : [],
@@ -244,7 +249,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const allFetchedOrders = allOrders.length > 0 ? allOrders : userOrders;
 
-      const populatedOrders: Order[] = allFetchedOrders.map(order => {
+      // FIX: Explicitly type the map callback to return `Order | null`. This resolves the type predicate error in the subsequent `.filter()` call.
+      const populatedOrders: Order[] = allFetchedOrders.map((order): Order | null => {
         if (!order) return null;
 
         const populatedOrderItems: OrderItem[] = (order.order_items && Array.isArray(order.order_items)) ? order.order_items.map((item: any) => {
@@ -278,12 +284,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 // FIX: Map from snake_case `customer_whatsapp` to camelCase `customerWhatsapp`.
           customerWhatsapp: order.customer_whatsapp,
           payment_method: order.payment_method,
-// FIX: Coalesce null values to undefined to match optional property type in `Order`.
-          payment_proof_url: order.payment_proof_url ?? undefined,
-          manual_delivery_data: order.manual_delivery_data ?? undefined,
+// FIX: Coalesce null values to undefined for optional properties. Using `||` correctly handles `null` from the database, whereas `??` does not.
+          payment_proof_url: order.payment_proof_url || undefined,
+          manual_delivery_data: order.manual_delivery_data || undefined,
         };
       })
-// FIX: The type predicate now works because the mapped object correctly matches the `Order` interface.
       .filter((order): order is Order => order !== null)
       .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -320,6 +325,92 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return null;
   }, [state.categories]);
+  
+  const handleNavigation = useCallback((page: PageKey, id: string | null, authMode: 'login' | 'signup') => {
+      const validPages: PageKey[] = [
+          'home', 'products', 'category', 'product_detail', 'auth', 'my_account', 
+          'admin', 'terms', 'privacy', 'refund', 'faq', 'about', 'contact', 'blog', 
+          'business', 'track_order'
+      ];
+      
+      const safePage = validPages.includes(page) ? page : 'home';
+
+      setState(prev => ({
+          ...prev,
+          currentPage: safePage,
+          currentCategoryId: safePage === 'category' ? id : null,
+          selectedProductId: safePage === 'product_detail' ? id : null,
+          authMode: safePage === 'auth' ? authMode : prev.authMode,
+      }));
+      window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
+      const handlePopState = (event: PopStateEvent) => {
+          if (event.state && event.state.page) {
+              const { page, id, authMode } = event.state;
+              handleNavigation(page, id, authMode || 'login');
+          } else {
+              try {
+                  const path = window.location.pathname;
+                  const parts = path.split('/').filter(Boolean);
+                  const page = (parts[0] || 'home') as PageKey;
+                  const id = parts[1] || null;
+                  handleNavigation(page, id, 'login');
+              } catch(e) {
+                  console.warn('Could not handle popstate path parsing:', e);
+                  handleNavigation('home', null, 'login');
+              }
+          }
+      };
+      
+      try {
+        window.addEventListener('popstate', handlePopState);
+      } catch (e) {
+        console.warn('Could not add popstate listener:', e);
+      }
+
+      // Initial load
+      try {
+        const path = window.location.pathname;
+        const parts = path.split('/').filter(Boolean);
+        const page = (parts[0] || 'home') as PageKey;
+        const id = parts[1] || null;
+        
+        handleNavigation(page, id, 'login');
+        window.history.replaceState({ page, id, authMode: 'login' }, '', path);
+      } catch (e) {
+        console.warn('Could not access history API for initial load:', e);
+        handleNavigation('home', null, 'login');
+      }
+      
+      return () => {
+        try {
+          window.removeEventListener('popstate', handlePopState);
+        } catch (e) {
+          console.warn('Could not remove popstate listener:', e);
+        }
+      };
+  }, [handleNavigation]);
+
+  const navigateTo = useCallback((page: PageKey, id: string | null = null, authMode: 'login' | 'signup' = 'login') => {
+      let path = `/${page}`;
+      if ((page === 'category' || page === 'product_detail') && id) {
+          path = `/${page}/${id}`;
+      } else if (page === 'home') {
+          path = '/';
+      }
+
+      try {
+        if (window.location.pathname !== path) {
+            window.history.pushState({ page, id, authMode }, '', path);
+        }
+      } catch (e) {
+        console.warn('Could not access history API for navigation:', e);
+      }
+      
+      handleNavigation(page, id, authMode);
+  }, [handleNavigation]);
 
   useEffect(() => {
     // Handle auth state changes
@@ -348,21 +439,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   // Persist cart to localStorage
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(state.cart));
+    try {
+      localStorage.setItem('cart', JSON.stringify(state.cart));
+    } catch (e) {
+      console.warn('Could not access localStorage to set cart:', e);
+    }
   }, [state.cart]);
 
   // --- Actions ---
-
-  const navigateTo = (page: PageKey, id: string | null = null, authMode: 'login' | 'signup' = 'login') => {
-    setState(prev => ({
-      ...prev,
-      currentPage: page,
-      currentCategoryId: page === 'category' ? id : prev.currentCategoryId,
-      selectedProductId: page === 'product_detail' ? id : null,
-      authMode: page === 'auth' ? authMode : prev.authMode,
-    }));
-    window.scrollTo(0, 0);
-  };
   
   const setAdminPage = (page: string) => {
     setState(prev => ({...prev, adminPage: page }));
@@ -645,7 +729,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateSiteSettings, addHeroSlide, updateHeroSlide, deleteHeroSlide,
     updatePage,
     upsertHomepageSections,
-  }), [state, findProductById, fetchData]);
+  }), [state, findProductById, fetchData, navigateTo]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
