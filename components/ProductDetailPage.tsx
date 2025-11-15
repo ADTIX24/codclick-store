@@ -24,13 +24,15 @@ const ProductDetailPage: React.FC = () => {
     const { t } = useLanguage();
     const imgRef = useRef<HTMLImageElement>(null);
     
-    const product = state.selectedProductId ? findProductById(state.selectedProductId) : null;
+    // FIX: Property 'selectedProductId' does not exist on type 'AppState'. Did you mean 'selected_product_id'?
+    const product = state.selected_product_id ? findProductById(state.selected_product_id) : null;
     const [activeImageIndex, setActiveImageIndex] = useState(0);
 
     useEffect(() => {
         // Reset to first image when product changes
         setActiveImageIndex(0);
-    }, [state.selectedProductId]);
+    // FIX: Property 'selectedProductId' does not exist on type 'AppState'. Did you mean 'selected_product_id'?
+    }, [state.selected_product_id]);
 
     const { relatedProducts } = useMemo(() => {
         if (!product) return { relatedProducts: [] };
@@ -106,7 +108,7 @@ const ProductDetailPage: React.FC = () => {
                         
                         <div className="border-t border-b border-slate-700/50 py-6 mb-6">
                              <h2 className="text-lg font-semibold text-white mb-2">{t('product_detail.description')}</h2>
-                            <p className="text-gray-400 leading-relaxed">
+                            <p className="text-gray-400 leading-relaxed whitespace-pre-line">
                                {t(product.description)}
                             </p>
                         </div>

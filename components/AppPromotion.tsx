@@ -15,7 +15,7 @@ const DownloadIcon: React.FC = () => (
 const AppPromotion: React.FC = () => {
     const { t } = useLanguage();
     const { state } = useAppContext();
-    const { siteSettings } = state;
+    const { site_settings } = state;
 
     return (
       <section className="bg-transparent py-20 sm:py-24">
@@ -38,7 +38,7 @@ const AppPromotion: React.FC = () => {
                 </p>
                 <div className="mt-10">
                   <a
-                    href={siteSettings.app_download_link || '#'}
+                    href={site_settings.app_download_link || '#'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-3 px-8 py-4 border border-transparent text-lg font-bold rounded-full text-slate-900 bg-amber-500 hover:bg-amber-600 transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-amber-500/40"

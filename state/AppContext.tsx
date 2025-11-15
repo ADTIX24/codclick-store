@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { supabaseClient } from '../supabase/client.ts';
 import type { AppState, PageKey, CartItem, Product, User, SignUpData, Order, OrderItem, Category, HeroSlide, SiteSettings, PageContent, UserRole, HomepageSection, PaymentMethod } from '../types.ts';
 import { HERO_SLIDES } from '../constants.ts';
-import type { AuthError, Session, User as SupabaseUser } from '@supabase/supabase-js';
+import type { AuthError, Session, User as SupabaseUser, UserResponse } from '@supabase/supabase-js';
 
 // Define the shape of the context value
 interface AppContextType {
@@ -10,10 +10,10 @@ interface AppContextType {
   navigateTo: (page: PageKey, id?: string | null, authMode?: 'login' | 'signup') => void;
   findProductById: (productId: string) => Product | null;
   // Auth
-  login: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  login: (email: string, password: string) => Promise<UserResponse>;
   signup: (data: SignUpData) => Promise<{ error: AuthError | null }>;
   logout: () => Promise<void>;
-  updateUser: (data: Partial<Pick<User, 'fullName' | 'whatsapp'>>) => Promise<{ error: any }>;
+  updateUser: (data: Partial<Pick<User, 'full_name' | 'whatsapp'>>) => Promise<{ error: any }>;
   changePassword: (password: string) => Promise<{ error: AuthError | null }>;
   // Cart
   addToCart: (product: Product, quantity?: number) => void;
@@ -24,7 +24,7 @@ interface AppContextType {
   setCheckoutOpen: (isOpen: boolean) => void;
   triggerFlyToCartAnimation: (element: HTMLElement | null) => void;
   // Orders
-  addOrder: (orderData: Omit<Order, 'id' | 'user_id' | 'date' | 'status'>) => Promise<{ error: any | null }>;
+  addOrder: (orderData: Omit<Order, 'id' | 'user_id' | 'created_at' | 'status'>) => Promise<{ error: any | null }>;
   // Admin
   setAdminPage: (page: string) => void;
   addCategory: (categoryData: Omit<Category, 'id' | 'products'>) => Promise<{ error: any | null }>;
@@ -42,20 +42,22 @@ interface AppContextType {
   deleteHeroSlide: (slideId: string) => Promise<{ error: any | null }>;
   updatePage: (pageKey: PageKey, content: any) => Promise<{ error: any | null }>;
   upsertHomepageSections: (sections: HomepageSection[]) => Promise<{ error: any | null }>;
+  setSearchTerm: (term: string) => void;
+  fetchAllData: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const initialAppState: AppState = {
-  currentPage: 'home',
-  currentCategoryId: null,
-  selectedProductId: null,
-  authMode: 'login',
-  adminPage: 'dashboard',
+  current_page: 'home',
+  current_category_id: null,
+  selected_product_id: null,
+  auth_mode: 'login',
+  admin_page: 'dashboard',
   categories: [],
   orders: [],
   users: [],
-  siteSettings: {
+  site_settings: {
     logo_url: '',
     slide_interval: 7,
     social_links: {
@@ -120,8 +122,8 @@ const initialAppState: AppState = {
         }
     ],
   },
-  heroSlides: HERO_SLIDES,
-  homepageSections: [],
+  hero_slides: HERO_SLIDES,
+  homepage_sections: [],
   pages: {
     terms: { titleKey: 'pages.terms.title', content: 'Terms content goes here...' },
     privacy: { titleKey: 'pages.privacy.title', content: 'Privacy content goes here...' },
@@ -132,11 +134,12 @@ const initialAppState: AppState = {
     blog: { titleKey: 'pages.blog.title', content: 'Blog content goes here...' },
     business: { titleKey: 'pages.business.title', content: 'For business content goes here...' },
   },
-  currentUser: null,
+  current_user: null,
   cart: [],
-  isCartOpen: false,
-  isCheckoutOpen: false,
+  is_cart_open: false,
+  is_checkout_open: false,
   loading: true,
+  search_term: '',
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -154,171 +157,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const setLoading = (loading: boolean) => setState(prev => ({ ...prev, loading }));
-
-  const fetchData = useCallback(async (user: SupabaseUser | null) => {
-    setLoading(true);
-    try {
-      // Fetch categories with products
-      const { data: categoriesData, error: categoriesError } = await supabaseClient
-        .from('categories')
-        .select(`
-          id,
-          name,
-          image_url,
-          products (
-            id,
-            name,
-            price,
-            image_urls,
-            description,
-            rating,
-            delivery_type,
-            delivery_content,
-            created_at
-          )
-        `).order('created_at', { ascending: true });
-      if (categoriesError) throw categoriesError;
-
-      // Fetch site settings
-      const { data: settingsData, error: settingsError } = await supabaseClient
-        .from('site_settings')
-        .select('*')
-        .single();
-       if (settingsError) console.warn("Could not fetch site settings, using defaults.", settingsError);
-
-      // Fetch hero slides
-      const { data: slidesData, error: slidesError } = await supabaseClient
-        .from('hero_slides')
-        .select('*')
-        .order('created_at', { ascending: true });
-      if (slidesError) console.warn("Could not fetch hero slides, using defaults.", slidesError);
-      
-      // Fetch pages
-      const { data: pagesData, error: pagesError } = await supabaseClient
-        .from('pages')
-        .select('*');
-      if (pagesError) console.warn("Could not fetch pages content.", pagesError);
-
-      // Fetch homepage sections
-      const { data: sectionsData, error: sectionsError } = await supabaseClient
-        .from('homepage_sections')
-        .select('*')
-        .order('index', { ascending: true });
-      if (sectionsError) console.warn("Could not fetch homepage sections.", sectionsError);
-
-      const pages: { [key in PageKey]?: PageContent } = { ...initialAppState.pages };
-      if(pagesData) {
-        pagesData.forEach(p => {
-            if (pages[p.id as PageKey]) {
-                pages[p.id as PageKey]!.content = p.content;
-            }
-        });
-      }
-
-
-// FIX: Type Supabase results as `any[]` to handle snake_case and declare `allUsers` in the correct scope.
-      let userOrders: any[] = [];
-      let allOrders: any[] = [];
-      let allUsers: User[] = [];
-
-      if (user) {
-        const userRole = (user.user_metadata?.role || 'customer') as UserRole;
-        if (userRole === 'owner' || userRole === 'moderator') {
-          // Fetch all users for admin
-          const { data: usersData, error: usersError } = await supabaseClient.from('users').select('*');
-          if (usersError) throw usersError;
-          allUsers = usersData.map(u => ({
-            id: u.id,
-            email: u.email,
-            fullName: u.full_name,
-            whatsapp: u.whatsapp,
-            role: u.role as UserRole,
-          }));
-
-          // Fetch all orders for admin
-          const { data: ordersData, error: ordersError } = await supabaseClient.from('orders').select('*');
-          if (ordersError) throw ordersError;
-          allOrders = ordersData;
-
-        } else {
-          // Fetch only current user's orders
-          const { data: ordersData, error: ordersError } = await supabaseClient.from('orders').select('*').eq('user_id', user.id);
-          if (ordersError) throw ordersError;
-          userOrders = ordersData;
-        }
-      }
-
-      const allFetchedOrders = allOrders.length > 0 ? allOrders : userOrders;
-
-      // FIX: Explicitly type the map callback to return `Order | null`. This resolves the type predicate error in the subsequent `.filter()` call.
-      const populatedOrders: Order[] = allFetchedOrders.map((order): Order | null => {
-        if (!order) return null;
-
-        const populatedOrderItems: OrderItem[] = (order.order_items && Array.isArray(order.order_items)) ? order.order_items.map((item: any) => {
-          const product = findProductById(item.id, categoriesData);
-          return {
-            ...item,
-            product: product || { 
-                id: item.id, 
-                name: 'Unknown Product', 
-                price: '0.00', 
-                image_urls: [], 
-                description: 'This product could not be found.', 
-                rating: 0, 
-                delivery_type: 'code', 
-                delivery_content: '',
-                created_at: new Date(0).toISOString(),
-            }
-          };
-        }) : [];
-        
-        return {
-          id: order.id,
-          user_id: order.user_id,
-          date: order.date,
-          order_items: populatedOrderItems,
-          total: order.total,
-          status: order.status,
-// FIX: Map from snake_case `customer_name` to camelCase `customerName`.
-          customerName: order.customer_name,
-// FIX: Map from snake_case `customer_email` to camelCase `customerEmail`.
-          customerEmail: order.customer_email,
-// FIX: Map from snake_case `customer_whatsapp` to camelCase `customerWhatsapp`.
-          customerWhatsapp: order.customer_whatsapp,
-          payment_method: order.payment_method,
-// FIX: Coalesce null values to undefined for optional properties. Using `||` correctly handles `null` from the database, whereas `??` does not.
-          payment_proof_url: order.payment_proof_url || undefined,
-          manual_delivery_data: order.manual_delivery_data || undefined,
-        };
-      })
-      .filter((order): order is Order => order !== null)
-      .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      // Merge fetched settings with defaults for payment_methods
-      const finalSettings = { ...initialAppState.siteSettings, ...settingsData };
-      if (!settingsData?.payment_methods || settingsData.payment_methods.length === 0) {
-        finalSettings.payment_methods = initialAppState.siteSettings.payment_methods;
-      }
-
-      setState(prev => ({
-        ...prev,
-        categories: categoriesData || [],
-        siteSettings: finalSettings,
-        heroSlides: slidesData?.length ? slidesData : prev.heroSlides,
-        homepageSections: sectionsData || [],
-        pages,
-        orders: populatedOrders,
-// FIX: `allUsers` is now correctly scoped and assigned.
-        users: allUsers,
-      }));
-
-    } catch (error) {
-      console.error("Error fetching initial data:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  
   const findProductById = useCallback((productId: string, categoriesToSearch?: Category[]): Product | null => {
     const cats = categoriesToSearch || state.categories;
     for (const category of cats) {
@@ -327,413 +166,434 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return null;
   }, [state.categories]);
-  
-  const handleNavigation = useCallback((page: PageKey, id: string | null, authMode: 'login' | 'signup') => {
-      const validPages: PageKey[] = [
-          'home', 'products', 'category', 'product_detail', 'auth', 'my_account', 
-          'admin', 'terms', 'privacy', 'refund', 'faq', 'about', 'contact', 'blog', 
-          'business', 'track_order'
-      ];
-      
-      const safePage = validPages.includes(page) ? page : 'home';
 
-      setState(prev => ({
-          ...prev,
-          currentPage: safePage,
-          currentCategoryId: safePage === 'category' ? id : null,
-          selectedProductId: safePage === 'product_detail' ? id : null,
-          authMode: safePage === 'auth' ? authMode : prev.authMode,
-      }));
-      window.scrollTo(0, 0);
+  const fetchAllData = useCallback(async () => {
+    try {
+        // --- STAGE 1: Fetch shell data for fast initial paint ---
+        setLoading(true);
+        
+        const [settingsRes, slidesRes, pagesRes, sectionsRes, categoriesRes] = await Promise.all([
+            supabaseClient.from('site_settings').select('*').single(),
+            supabaseClient.from('hero_slides').select('*').order('created_at', { ascending: true }),
+            supabaseClient.from('pages').select('*'),
+            supabaseClient.from('homepage_sections').select('*').order('index', { ascending: true }),
+            supabaseClient.from('categories').select('id, name, image_url').order('created_at', { ascending: true }),
+        ]);
+
+        const settingsData = settingsRes.data;
+        const slidesData = slidesRes.data;
+        const pagesData = pagesRes.data;
+        const sectionsData = sectionsRes.data || [];
+        const categoriesOnlyData = (categoriesRes.data || []).map(cat => ({...cat, products: [] as Product[]}));
+
+        const pages: { [key in PageKey]?: PageContent } = { ...initialAppState.pages };
+        if(pagesData) {
+            pagesData.forEach((p: any) => {
+                if (pages[p.id as PageKey]) pages[p.id as PageKey]!.content = p.content;
+            });
+        }
+
+        // Set state to unblock UI
+        setState(prev => ({
+            ...prev,
+            categories: categoriesOnlyData,
+            site_settings: settingsData ? { ...prev.site_settings, ...settingsData } : prev.site_settings,
+            hero_slides: slidesData && slidesData.length > 0 ? slidesData : HERO_SLIDES,
+            pages,
+            homepage_sections: sectionsData,
+            loading: false, // <-- UI UNBLOCKED
+        }));
+        
+        // --- STAGE 2: Fetch ALL products in the background ---
+        const { data: allProductsData, error: productsError } = await supabaseClient
+            .from('products')
+            .select('id, category_id, name, price, image_urls, description, rating, delivery_type, delivery_content, created_at');
+        
+        if (productsError) {
+            console.warn("Error fetching products in background:", productsError);
+            return;
+        }
+
+        // Update state with all products
+        setState(prev => {
+            const finalCategories = prev.categories.map(cat => ({
+                ...cat,
+                products: (allProductsData || []).filter(p => p.category_id === cat.id) as Product[]
+            }));
+            return { ...prev, categories: finalCategories };
+        });
+
+    } catch (error) {
+        console.error("Error during data load:", error);
+        setState(prev => ({ ...prev, loading: false }));
+    }
   }, []);
 
   useEffect(() => {
-      const handlePopState = (event: PopStateEvent) => {
-          if (event.state && event.state.page) {
-              const { page, id, authMode } = event.state;
-              handleNavigation(page, id, authMode || 'login');
-          } else {
-              try {
-                  const path = window.location.pathname;
-                  const parts = path.split('/').filter(Boolean);
-                  const page = (parts[0] || 'home') as PageKey;
-                  const id = parts[1] || null;
-                  handleNavigation(page, id, 'login');
-              } catch(e) {
-                  console.warn('Could not handle popstate path parsing:', e);
-                  handleNavigation('home', null, 'login');
-              }
-          }
-      };
-      
-      try {
-        window.addEventListener('popstate', handlePopState);
-      } catch (e) {
-        console.warn('Could not add popstate listener:', e);
-      }
+    let isMounted = true;
 
-      // Initial load
-      try {
-        const path = window.location.pathname;
-        const parts = path.split('/').filter(Boolean);
-        const page = (parts[0] || 'home') as PageKey;
-        const id = parts[1] || null;
-        
-        handleNavigation(page, id, 'login');
-        window.history.replaceState({ page, id, authMode: 'login' }, '', path);
-      } catch (e) {
-        console.warn('Could not access history API for initial load:', e);
-        handleNavigation('home', null, 'login');
+    const initializeSessionAndData = async () => {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      
+      if (!isMounted) return;
+
+      const user = session?.user || null;
+      let currentUser: User | null = null;
+      if (user) {
+        currentUser = {
+          id: user.id,
+          email: user.email || '',
+          full_name: user.user_metadata?.full_name || 'User',
+          whatsapp: user.user_metadata?.whatsapp,
+          role: user.user_metadata?.role || 'customer',
+        };
       }
       
-      return () => {
-        try {
-          window.removeEventListener('popstate', handlePopState);
-        } catch (e) {
-          console.warn('Could not remove popstate listener:', e);
-        }
-      };
-  }, [handleNavigation]);
+      setState(prev => ({ ...prev, current_user: currentUser }));
+      await fetchAllData();
+    };
 
-  const navigateTo = useCallback((page: PageKey, id: string | null = null, authMode: 'login' | 'signup' = 'login') => {
-      let path = `/${page}`;
-      if ((page === 'category' || page === 'product_detail') && id) {
-          path = `/${page}/${id}`;
-      } else if (page === 'home') {
-          path = '/';
-      }
+    initializeSessionAndData();
 
-      try {
-        if (window.location.pathname !== path) {
-            window.history.pushState({ page, id, authMode }, '', path);
-        }
-      } catch (e) {
-        console.warn('Could not access history API for navigation:', e);
+    const { data: authListener } = supabaseClient.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+      
+      const user = session?.user || null;
+      let currentUser: User | null = null;
+      if (user) {
+        currentUser = {
+          id: user.id,
+          email: user.email || '',
+          full_name: user.user_metadata?.full_name || 'User',
+          whatsapp: user.user_metadata?.whatsapp,
+          role: user.user_metadata?.role || 'customer',
+        };
       }
       
-      handleNavigation(page, id, authMode);
-  }, [handleNavigation]);
-
-  useEffect(() => {
-    // Handle auth state changes
-    const { data: authListener } = supabaseClient.auth.onAuthStateChange(
-      async (event, session: Session | null) => {
-        const supabaseUser = session?.user || null;
-        let appUser: User | null = null;
-        if (supabaseUser) {
-          appUser = {
-            id: supabaseUser.id,
-            email: supabaseUser.email!,
-            fullName: supabaseUser.user_metadata?.full_name || '',
-            whatsapp: supabaseUser.user_metadata?.whatsapp || '',
-            role: (supabaseUser.user_metadata?.role || 'customer') as UserRole,
-          };
-        }
-        setState(prev => ({ ...prev, currentUser: appUser }));
-        fetchData(supabaseUser);
+      if (event === 'SIGNED_OUT') {
+          setState(prev => ({ ...prev, current_user: null, orders: [], users: [] }));
+      } else {
+          setState(prev => ({ ...prev, current_user: currentUser }));
       }
-    );
+    });
 
     return () => {
-      authListener.subscription.unsubscribe();
+      isMounted = false;
+      authListener?.subscription.unsubscribe();
     };
-  }, [fetchData]);
+  }, [fetchAllData]);
   
   // Persist cart to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem('cart', JSON.stringify(state.cart));
+        localStorage.setItem('cart', JSON.stringify(state.cart));
     } catch (e) {
-      console.warn('Could not access localStorage to set cart:', e);
+        console.warn('Could not access localStorage to save cart:', e);
     }
   }, [state.cart]);
 
-  // --- Actions ---
-  
-  const setAdminPage = (page: string) => {
-    setState(prev => ({...prev, adminPage: page }));
-  }
-
-  // Auth actions
-  const login = async (email: string, password: string) => {
-    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    return { error };
+  const setSearchTerm = (term: string) => {
+    setState(prev => ({ ...prev, search_term: term }));
   };
 
+  const navigateTo = (page: PageKey, id: string | null = null, authMode: 'login' | 'signup' = 'login') => {
+    const isSearchPage = page === 'products' || page === 'category';
+    setState(prev => ({
+      ...prev,
+      current_page: page,
+      current_category_id: page === 'category' ? id : null,
+      selected_product_id: page === 'product_detail' ? id : null,
+      auth_mode: page === 'auth' ? authMode : prev.auth_mode,
+      search_term: isSearchPage ? prev.search_term : '',
+    }));
+    window.scrollTo(0, 0);
+  };
+
+  // --- Auth Actions ---
+  const login = (email: string, password: string) => supabaseClient.auth.signInWithPassword({ email, password });
   const signup = async (data: SignUpData) => {
-    const { error } = await supabaseClient.auth.signUp({
-      email: data.email,
-      password: data.password,
-      options: {
-        data: {
-          full_name: data.fullName,
-          whatsapp: data.whatsapp,
-          role: 'customer', // Default role
-        },
-      },
-    });
-    return { error };
+      const { full_name: fullName, email, password, whatsapp } = data;
+      const { error } = await supabaseClient.auth.signUp({
+          email,
+          password,
+          options: {
+              data: {
+                  full_name: fullName,
+                  whatsapp,
+                  role: 'customer', // Default role on sign up
+              }
+          }
+      });
+      return { error };
   };
-
   const logout = async () => {
     await supabaseClient.auth.signOut();
-    setState(prev => ({ ...prev, currentUser: null, orders: [], users: [] }));
-    navigateTo('home');
   };
-  
-  const updateUser = async (data: Partial<Pick<User, 'fullName' | 'whatsapp'>>) => {
-    const { data: { user } , error } = await supabaseClient.auth.updateUser({
-      data: { full_name: data.fullName, whatsapp: data.whatsapp }
-    });
-    if(!error && user) {
-        setState(prev => ({...prev, currentUser: { ...prev.currentUser!, fullName: user.user_metadata.full_name, whatsapp: user.user_metadata.whatsapp } }));
-    }
-    return { error };
-  }
-  
-  const changePassword = async (password: string) => {
-      const { error } = await supabaseClient.auth.updateUser({ password });
-      return { error };
-  }
-
-  // Cart actions
-  const addToCart = (product: Product, quantity = 1) => {
-    setState(prev => {
-      const existingItem = prev.cart.find(item => item.product.id === product.id);
-      if (existingItem) {
-        return {
-          ...prev,
-          cart: prev.cart.map(item =>
-            item.product.id === product.id ? { ...item, quantity: item.quantity + quantity } : item
-          ),
-        };
-      }
-      return { ...prev, cart: [...prev.cart, { product, quantity }] };
-    });
-  };
-
-  const updateCartQuantity = (productId: string, quantity: number) => {
-    if (quantity < 1) {
-      removeFromCart(productId);
-      return;
-    }
-    setState(prev => ({
-      ...prev,
-      cart: prev.cart.map(item =>
-        item.product.id === productId ? { ...item, quantity } : item
-      ),
-    }));
-  };
-
-  const removeFromCart = (productId: string) => {
-    setState(prev => ({
-      ...prev,
-      cart: prev.cart.filter(item => item.product.id !== productId),
-    }));
-  };
-
-  const clearCart = () => setState(prev => ({ ...prev, cart: [] }));
-  const setCartOpen = (isOpen: boolean) => setState(prev => ({ ...prev, isCartOpen: isOpen }));
-  const setCheckoutOpen = (isOpen: boolean) => setState(prev => ({ ...prev, isCheckoutOpen: isOpen }));
-
-  const triggerFlyToCartAnimation = (element: HTMLElement | null) => {
-    if (!element) return;
-    
-    const cartIcon = document.getElementById('cart-icon-target') || document.getElementById('cart-icon-target-mobile');
-    if (!cartIcon) return;
-  
-    const flyingItem = document.getElementById('flying-cart-item');
-    if(!flyingItem) return;
-
-    const rect = element.getBoundingClientRect();
-    const cartRect = cartIcon.getBoundingClientRect();
-
-    flyingItem.style.left = `${rect.left}px`;
-    flyingItem.style.top = `${rect.top}px`;
-    flyingItem.style.width = `${rect.width}px`;
-    flyingItem.style.height = `${rect.height}px`;
-    flyingItem.style.backgroundImage = `url(${(element as HTMLImageElement).src})`;
-    flyingItem.style.backgroundSize = 'contain';
-    flyingItem.style.backgroundRepeat = 'no-repeat';
-    flyingItem.style.backgroundPosition = 'center';
-
-    requestAnimationFrame(() => {
-        flyingItem.style.transition = 'left 0.5s ease-in-out, top 0.5s ease-in-out, width 0.5s ease-in-out, height 0.5s ease-in-out, opacity 0.5s ease-in-out';
-        flyingItem.style.opacity = '1';
-        flyingItem.style.left = `${cartRect.left + cartRect.width / 2}px`;
-        flyingItem.style.top = `${cartRect.top + cartRect.height / 2}px`;
-        flyingItem.style.width = '20px';
-        flyingItem.style.height = '20px';
-        flyingItem.style.opacity = '0';
-    });
-  };
-  
-  // Order actions
-  const addOrder = async (orderData: Omit<Order, 'id' | 'user_id' | 'date' | 'status'>) => {
-      const orderItems = orderData.order_items.map(item => ({
-          id: item.product.id,
-          name: item.product.name,
-          price: item.product.price,
-          quantity: item.quantity,
-          image_url: item.product.image_urls[0]
-      }));
-
-      const { error } = await supabaseClient.from('orders').insert({
-          user_id: state.currentUser?.id,
-          customer_name: orderData.customerName,
-          customer_email: orderData.customerEmail,
-          customer_whatsapp: orderData.customerWhatsapp,
-          order_items: orderItems,
-          total: orderData.total,
-          status: 'Payment Pending',
-          payment_method: orderData.payment_method,
-          payment_proof_url: orderData.payment_proof_url,
+  const updateUser = async (data: Partial<Pick<User, 'full_name' | 'whatsapp'>>) => {
+      const { error } = await supabaseClient.auth.updateUser({
+          data: {
+              full_name: data.full_name,
+              whatsapp: data.whatsapp
+          }
       });
       if (!error) {
-        fetchData(state.currentUser);
+        setState(prev => ({...prev, current_user: {...prev.current_user!, ...data}}))
       }
       return { error };
-  }
+  };
+  const changePassword = (password: string) => supabaseClient.auth.updateUser({ password });
 
-  // Admin actions
-  const addCategory = async (categoryData: Omit<Category, 'id' | 'products'>) => {
-      const { error } = await supabaseClient.from('categories').insert(categoryData);
-      if(!error) fetchData(state.currentUser);
-      return { error };
-  }
-
-  const updateCategory = async (categoryData: Omit<Category, 'products'>) => {
-      const { error } = await supabaseClient.from('categories').update({ name: categoryData.name, image_url: categoryData.image_url }).eq('id', categoryData.id);
-      if(!error) fetchData(state.currentUser);
-      return { error };
-  }
-
-  const deleteCategory = async (categoryId: string) => {
-      const { error } = await supabaseClient.from('categories').delete().eq('id', categoryId);
-      if(!error) fetchData(state.currentUser);
-      return { error };
-  }
+  // --- Cart Actions ---
+  const addToCart = (product: Product, quantity: number = 1) => {
+      setState(prev => {
+          const existingItem = prev.cart.find(item => item.product.id === product.id);
+          if (existingItem) {
+              return {
+                  ...prev,
+                  cart: prev.cart.map(item =>
+                      item.product.id === product.id
+                          ? { ...item, quantity: item.quantity + quantity }
+                          : item
+                  ),
+              };
+          }
+          return { ...prev, cart: [...prev.cart, { product, quantity }] };
+      });
+  };
+  const updateCartQuantity = (productId: string, quantity: number) => {
+    if (quantity <= 0) {
+      removeFromCart(productId);
+    } else {
+      setState(prev => ({
+        ...prev,
+        cart: prev.cart.map(item =>
+          item.product.id === productId ? { ...item, quantity } : item
+        ),
+      }));
+    }
+  };
+  const removeFromCart = (productId: string) => {
+      setState(prev => ({
+          ...prev,
+          cart: prev.cart.filter(item => item.product.id !== productId),
+      }));
+  };
+  const clearCart = () => setState(prev => ({ ...prev, cart: [] }));
+  const setCartOpen = (isOpen: boolean) => setState(prev => ({ ...prev, is_cart_open: isOpen }));
+  const setCheckoutOpen = (isOpen: boolean) => setState(prev => ({ ...prev, is_checkout_open: isOpen }));
   
+  const triggerFlyToCartAnimation = (element: HTMLElement | null) => {
+        if (!element) return;
+        
+        const rect = element.getBoundingClientRect();
+        const flyingItem = document.getElementById('flying-cart-item');
+        const cartIcon = document.getElementById('cart-icon-target') || document.getElementById('cart-icon-target-mobile');
+        if (!flyingItem || !cartIcon) return;
+        
+        const cartRect = cartIcon.getBoundingClientRect();
+
+        Object.assign(flyingItem.style, {
+            left: `${rect.left}px`,
+            top: `${rect.top}px`,
+            width: `${rect.width}px`,
+            height: `${rect.height}px`,
+            backgroundImage: `url(${(element as HTMLImageElement).src})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            opacity: '1',
+            transition: 'none',
+        });
+        
+        requestAnimationFrame(() => {
+            Object.assign(flyingItem.style, {
+                transition: 'all 0.6s cubic-bezier(0.5, -0.5, 0.5, 1.5)',
+                left: `${cartRect.left + cartRect.width / 2}px`,
+                top: `${cartRect.top + cartRect.height / 2}px`,
+                width: '1rem',
+                height: '1rem',
+                opacity: '0',
+            });
+        });
+  };
+
+  // --- Order Actions ---
+  const addOrder = async (orderData: Omit<Order, 'id' | 'user_id' | 'created_at' | 'status'>) => {
+    if (!state.current_user) return { error: new Error('User not logged in') };
+    
+    try {
+      const productIds = orderData.order_items.map(item => item.product.id);
+      const { data: fullProductsData, error: productsError } = await supabaseClient
+        .from('products')
+        .select('*')
+        .in('id', productIds);
+
+      if (productsError) throw productsError;
+
+      const fullProductsMap = new Map(fullProductsData.map(p => [p.id, p]));
+      const fullOrderItems = orderData.order_items.map(item => ({...item, product: fullProductsMap.get(item.product.id) || item.product}));
+
+      const { error } = await supabaseClient.from('orders').insert([{
+        user_id: state.current_user.id,
+        status: 'Payment Pending',
+        ...orderData,
+        order_items: fullOrderItems,
+      }]).select().single();
+
+      if (error) throw error;
+      
+      return { error: null };
+    } catch (e: any) {
+      console.error('Unexpected error in addOrder:', e);
+      return { error: e };
+    }
+  };
+  
+  const refreshAdminData = async () => {
+    // A simplified refresh function for admin actions
+    await fetchAllData();
+  }
+
+  // --- Admin Actions ---
+  const setAdminPage = (page: string) => setState(prev => ({ ...prev, admin_page: page }));
+  const addCategory = async (categoryData: Omit<Category, 'id' | 'products'>) => {
+    const { error } = await supabaseClient.from('categories').insert([categoryData]);
+    if (!error) await refreshAdminData();
+    return { error };
+  };
+  const updateCategory = async (categoryData: Omit<Category, 'products'>) => {
+    const { error } = await supabaseClient.from('categories').update(categoryData).eq('id', categoryData.id);
+    if (!error) await refreshAdminData();
+    return { error };
+  };
+  const deleteCategory = async (categoryId: string) => {
+    const { error } = await supabaseClient.from('categories').delete().eq('id', categoryId);
+    if (!error) await refreshAdminData();
+    return { error };
+  };
   const addProduct = async (categoryId: string, productData: Omit<Product, 'id'>) => {
-      const { error } = await supabaseClient.from('products').insert({ ...productData, category_id: categoryId });
-      if(!error) fetchData(state.currentUser);
-      return { error };
-  }
-
+    const payload = { ...productData, category_id: categoryId };
+    const { error } = await supabaseClient.from('products').insert([payload]);
+    if (!error) await refreshAdminData();
+    return { error };
+  };
   const updateProduct = async (productId: string, productData: Omit<Product, 'id'>, newCategoryId: string) => {
-      const { error } = await supabaseClient.from('products').update({ ...productData, category_id: newCategoryId }).eq('id', productId);
-      if(!error) fetchData(state.currentUser);
+      const payload = { ...productData, category_id: newCategoryId };
+      const { error } = await supabaseClient.from('products').update(payload).eq('id', productId);
+      if (!error) await refreshAdminData();
       return { error };
-  }
-
+  };
   const deleteProduct = async (productId: string) => {
       const { error } = await supabaseClient.from('products').delete().eq('id', productId);
-      if(!error) fetchData(state.currentUser);
+      if (!error) await refreshAdminData();
       return { error };
-  }
-
+  };
   const updateOrderStatus = async (orderId: string, status: Order['status']) => {
-      const { error } = await supabaseClient.from('orders').update({ status }).eq('id', orderId);
-      if(!error) fetchData(state.currentUser);
-      return { error };
-  }
-  
-  const updateOrderDelivery = async (orderId: string, deliveryData: { [itemId: string]: string | string[] }) => {
+    const { error } = await supabaseClient.from('orders').update({ status }).eq('id', orderId);
+    return { error };
+  };
+   const updateOrderDelivery = async (orderId: string, deliveryData: { [itemId: string]: string | string[] }) => {
     const { error } = await supabaseClient.from('orders').update({ manual_delivery_data: deliveryData }).eq('id', orderId);
-    if (!error) fetchData(state.currentUser);
     return { error };
   };
-
   const updateUserRole = async (userId: string, role: UserRole, fullName: string) => {
-    const { error } = await supabaseClient.rpc('update_user_role_and_meta', {
-        user_id: userId,
-        new_role: role,
-        new_full_name: fullName
-    });
-    if (!error) fetchData(state.currentUser);
+      const { error } = await supabaseClient.rpc('update_user_role_and_meta', {
+          user_id: userId,
+          new_role: role,
+          new_full_name: fullName
+      });
+      return { error };
+  };
+  const updateSiteSettings = async (settings: SiteSettings) => {
+    const { error } = await supabaseClient.from('site_settings').update(settings).eq('id', 1);
+    if (!error) setState(prev => ({ ...prev, site_settings: settings }));
     return { error };
   };
-  
-  const updateSiteSettings = async (settings: SiteSettings) => {
-    const { error } = await supabaseClient.from('site_settings').update(settings).eq('id', 1); // Assuming single row with id=1
-    if (!error) fetchData(state.currentUser);
-    return { error };
-  }
-
   const addHeroSlide = async (slideData: Omit<HeroSlide, 'id'>) => {
-    const { error } = await supabaseClient.from('hero_slides').insert(slideData);
-    if (!error) fetchData(state.currentUser);
-    return { error };
-  }
-
+      const { error } = await supabaseClient.from('hero_slides').insert([slideData]);
+      if (!error) await refreshAdminData();
+      return { error };
+  };
   const updateHeroSlide = async (slideData: HeroSlide) => {
-    const { error } = await supabaseClient.from('hero_slides').update(slideData).eq('id', slideData.id);
-    if (!error) fetchData(state.currentUser);
-    return { error };
-  }
-
+      const { error } = await supabaseClient.from('hero_slides').update(slideData).eq('id', slideData.id);
+      if (!error) await refreshAdminData();
+      return { error };
+  };
   const deleteHeroSlide = async (slideId: string) => {
-    const { error } = await supabaseClient.from('hero_slides').delete().eq('id', slideId);
-    if (!error) fetchData(state.currentUser);
-    return { error };
-  }
-  
+      const { error } = await supabaseClient.from('hero_slides').delete().eq('id', slideId);
+      if (!error) await refreshAdminData();
+      return { error };
+  };
   const updatePage = async (pageKey: PageKey, content: any) => {
-    const { error } = await supabaseClient.from('pages').update({ content }).eq('id', pageKey);
-    if(!error) fetchData(state.currentUser);
-    return { error };
-  }
-
+      const { error } = await supabaseClient.from('pages').upsert({ id: pageKey, content }, { onConflict: 'id' });
+      if (!error) await refreshAdminData();
+      return { error };
+  };
   const upsertHomepageSections = async (sections: HomepageSection[]) => {
-    const { data: existingSections, error: fetchError } = await supabaseClient.from('homepage_sections').select('id');
-    if (fetchError) return { error: fetchError };
-
-    const existingIds = existingSections.map(s => s.id);
-    const newIds = sections.map(s => s.id);
-    const idsToDelete = existingIds.filter(id => !newIds.includes(id));
-
-    if (idsToDelete.length > 0) {
-        const { error: deleteError } = await supabaseClient.from('homepage_sections').delete().in('id', idsToDelete);
-        if (deleteError) return { error: deleteError };
-    }
-
-    const sectionsToUpsert = sections.map((section, index) => ({
+      const upsertData = sections.map((section, index) => ({
         id: section.id,
-        index,
         type: section.type,
         title: section.title,
         subtitle: section.subtitle,
         category_id: section.category_id,
         visible: section.visible,
-    }));
-
-    if (sectionsToUpsert.length > 0) {
-        const { error } = await supabaseClient.from('homepage_sections').upsert(sectionsToUpsert, { onConflict: 'id' });
-        if (error) return { error };
-    }
-
-    fetchData(state.currentUser);
-    return { error: null };
+        index,
+      }));
+      const { error } = await supabaseClient.from('homepage_sections').upsert(upsertData, { onConflict: 'id' });
+      
+      const allSectionIds = sections.map(s => s.id);
+      if (allSectionIds.length > 0) {
+        const { error: deleteError } = await supabaseClient
+          .from('homepage_sections')
+          .delete()
+          .not('id', 'in', `(${allSectionIds.join(',')})`);
+         if (!error && !deleteError) await refreshAdminData();
+         return { error: error || deleteError };
+      } else {
+        const { error: deleteAllError } = await supabaseClient.from('homepage_sections').delete().neq('id', crypto.randomUUID());
+        if (!error && !deleteAllError) await refreshAdminData();
+        return { error: error || deleteAllError };
+      }
   };
 
-  const value = useMemo(() => ({
+  const contextValue = useMemo(() => ({
     state,
     navigateTo,
     findProductById,
-    login, signup, logout, updateUser, changePassword,
-    addToCart, updateCartQuantity, removeFromCart, clearCart, setCartOpen, setCheckoutOpen, triggerFlyToCartAnimation,
+    login,
+    signup,
+    logout,
+    updateUser,
+    changePassword,
+    addToCart,
+    updateCartQuantity,
+    removeFromCart,
+    clearCart,
+    setCartOpen,
+    setCheckoutOpen,
+    triggerFlyToCartAnimation,
     addOrder,
     setAdminPage,
-    addCategory, updateCategory, deleteCategory,
-    addProduct, updateProduct, deleteProduct,
-    updateOrderStatus, updateOrderDelivery,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    updateOrderStatus,
+    updateOrderDelivery,
     updateUserRole,
-    updateSiteSettings, addHeroSlide, updateHeroSlide, deleteHeroSlide,
+    updateSiteSettings,
+    addHeroSlide,
+    updateHeroSlide,
+    deleteHeroSlide,
     updatePage,
     upsertHomepageSections,
-  }), [state, findProductById, fetchData, navigateTo]);
+    setSearchTerm,
+    fetchAllData,
+  }), [state, findProductById, navigateTo, login, signup, logout, updateUser, changePassword, addToCart, updateCartQuantity, removeFromCart, clearCart, setCartOpen, setCheckoutOpen, triggerFlyToCartAnimation, addOrder, setAdminPage, addCategory, updateCategory, deleteCategory, addProduct, updateProduct, deleteProduct, updateOrderStatus, updateOrderDelivery, updateUserRole, updateSiteSettings, addHeroSlide, updateHeroSlide, deleteHeroSlide, updatePage, upsertHomepageSections, setSearchTerm, fetchAllData]);
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  // @ts-ignore
+  return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 };
 
 export const useAppContext = (): AppContextType => {

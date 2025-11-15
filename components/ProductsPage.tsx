@@ -13,7 +13,7 @@ interface ProductsPageProps {
 const ProductsPage: React.FC<ProductsPageProps> = ({ categoryId }) => {
   const { t } = useLanguage();
   const { state, navigateTo } = useAppContext();
-  const { categories } = state;
+  const { categories, search_term } = state;
   
   const [activeCategory, setActiveCategory] = useState<string>(categoryId || 'all');
 
@@ -22,13 +22,27 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ categoryId }) => {
   }, [categoryId]);
 
   const { currentCategory, productsToShow } = useMemo(() => {
+    let initialProducts;
+    let category = null;
+
     if (activeCategory === 'all') {
-      const allProducts = categories.flatMap(cat => cat.products);
-      return { currentCategory: null, productsToShow: allProducts };
+      initialProducts = categories.flatMap(cat => cat.products);
+    } else {
+      category = categories.find(cat => cat.id === activeCategory) || null;
+      initialProducts = category?.products || [];
     }
-    const category = categories.find(cat => cat.id === activeCategory);
-    return { currentCategory: category || null, productsToShow: category?.products || [] };
-  }, [activeCategory, categories]);
+
+    if (!search_term.trim()) {
+        return { currentCategory: category, productsToShow: initialProducts };
+    }
+
+    const lowercasedTerm = search_term.toLowerCase();
+    const filteredProducts = initialProducts.filter(product => 
+        t(product.name).toLowerCase().includes(lowercasedTerm)
+    );
+
+    return { currentCategory: category, productsToShow: filteredProducts };
+  }, [activeCategory, categories, search_term, t]);
   
   const handleCategoryClick = (id: string) => {
     setActiveCategory(id);
@@ -40,10 +54,15 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ categoryId }) => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-12">
           <h1 className="text-4xl sm:text-5xl font-extrabold text-white">
-            {currentCategory ? t(currentCategory.name) : t('header.all_cards')}
+            {search_term
+                ? `نتائج البحث عن: "${search_term}"`
+                : (currentCategory ? t(currentCategory.name) : t('header.all_cards'))
+            }
           </h1>
           <p className="mt-4 text-lg text-gray-400">
-            {currentCategory ? `تصفح جميع المنتجات في فئة ${t(currentCategory.name)}` : 'تصفح مجموعتنا الكاملة من البطاقات الرقمية.'}
+            {search_term
+                ? `تم العثور على ${productsToShow.length} منتج.`
+                : (currentCategory ? `تصفح جميع المنتجات في فئة ${t(currentCategory.name)}` : 'تصفح مجموعتنا الكاملة من البطاقات الرقمية.')}
           </p>
         </div>
         

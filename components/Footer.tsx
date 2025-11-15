@@ -31,8 +31,8 @@ const socialIcons: { [key: string]: React.FC } = {
 const Footer: React.FC = () => {
   const { t, toggleLanguage } = useLanguage();
   const { state, navigateTo } = useAppContext();
-  const { siteSettings } = state;
-  const { social_links, logo_url } = siteSettings;
+  const { site_settings } = state;
+  const { social_links, logo_url } = site_settings;
   
   const handleNav = (e: React.MouseEvent, page: PageKey) => {
     e.preventDefault();
@@ -136,7 +136,7 @@ const Footer: React.FC = () => {
           </div>
         </div>
         <div className="mt-12 border-t border-slate-700/50 pt-8 text-center text-gray-500">
-          <p>{siteSettings.copyright_text || t('footer.copyright')}</p>
+          <p>{site_settings.copyright_text || t('footer.copyright')}</p>
           <div className="mt-4">
             <button onClick={toggleLanguage} className="text-sm text-gray-400 hover:text-amber-400 transition-colors">
                 {t('toggle_language')}

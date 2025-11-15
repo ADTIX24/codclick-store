@@ -142,12 +142,12 @@ const AdminPaymentMethods: React.FC = () => {
     const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
 
     useEffect(() => {
-        setMethods(state.siteSettings.payment_methods || []);
-    }, [state.siteSettings.payment_methods]);
+        setMethods(state.site_settings.payment_methods || []);
+    }, [state.site_settings.payment_methods]);
 
     const handleSaveAll = async () => {
         setMessage(null);
-        const newSettings = { ...state.siteSettings, payment_methods: methods };
+        const newSettings = { ...state.site_settings, payment_methods: methods };
         const { error } = await updateSiteSettings(newSettings);
         if (error) {
             setMessage({ text: t('admin.payment.save_fail') + `: ${error.message}`, type: 'error' });

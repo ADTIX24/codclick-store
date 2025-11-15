@@ -9,7 +9,7 @@ export interface Product {
   description: string;
   rating: number;
   delivery_type: 'code' | 'image' | 'pdf' | 'excel' | 'word' | 'video' | 'audio';
-  delivery_content: string | string[];
+  delivery_content?: string | string[];
   created_at: string;
 }
 
@@ -69,7 +69,7 @@ export type UserRole = 'owner' | 'moderator' | 'customer' | 'vip';
 export interface User {
   id: string;
   email: string;
-  fullName: string;
+  full_name: string;
   whatsapp?: string;
   role: UserRole;
 }
@@ -83,13 +83,13 @@ export interface OrderItem {
 export interface Order {
   id: string;
   user_id: string;
-  date: string; // ISO string
+  created_at: string; // ISO string
   order_items: OrderItem[];
   total: number;
   status: 'Payment Pending' | 'Processing' | 'Completed' | 'Cancelled';
-  customerName: string;
-  customerEmail: string;
-  customerWhatsapp: string;
+  customer_name: string;
+  customer_email: string;
+  customer_whatsapp: string;
   payment_method: string;
   payment_proof_url?: string;
   manual_delivery_data?: { [itemId: string]: string | string[] };
@@ -131,27 +131,28 @@ export interface PageContent {
 
 export interface AppState {
   // Navigation
-  currentPage: PageKey;
-  currentCategoryId: string | null;
-  selectedProductId: string | null;
-  authMode: 'login' | 'signup';
-  adminPage: string;
+  current_page: PageKey;
+  current_category_id: string | null;
+  selected_product_id: string | null;
+  auth_mode: 'login' | 'signup';
+  admin_page: string;
 
   // Data
   categories: Category[];
   orders: Order[];
   users: User[];
-  siteSettings: SiteSettings;
-  heroSlides: HeroSlide[];
+  site_settings: SiteSettings;
+  hero_slides: HeroSlide[];
   pages: { [key in PageKey]?: PageContent };
-  homepageSections: HomepageSection[];
+  homepage_sections: HomepageSection[];
 
   // User & Cart
-  currentUser: User | null;
+  current_user: User | null;
   cart: CartItem[];
-  isCartOpen: boolean;
-  isCheckoutOpen: boolean;
+  is_cart_open: boolean;
+  is_checkout_open: boolean;
   loading: boolean;
+  search_term: string;
 }
 
 export interface CartItem {
@@ -187,7 +188,7 @@ export interface LanguageContextType {
 
 // Supabase signup data
 export interface SignUpData {
-    fullName: string;
+    full_name: string;
     email: string;
     password: string;
     whatsapp?: string;

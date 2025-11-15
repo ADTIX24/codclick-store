@@ -128,16 +128,16 @@ const AdminSettings: React.FC = () => {
     const { state, updateSiteSettings, addHeroSlide, updateHeroSlide, deleteHeroSlide } = useAppContext();
     const { t } = useLanguage();
 
-    const [settings, setSettings] = useState<SiteSettings>(state.siteSettings);
-    const [slides, setSlides] = useState<HeroSlide[]>(state.heroSlides);
+    const [settings, setSettings] = useState<SiteSettings>(state.site_settings);
+    const [slides, setSlides] = useState<HeroSlide[]>(state.hero_slides);
     const [slideModal, setSlideModal] = useState<{isOpen: boolean; slide: HeroSlide | null}>({isOpen: false, slide: null});
     const [showSuccess, setShowSuccess] = useState(false);
 
 
     useEffect(() => {
-        setSettings(state.siteSettings);
-        setSlides(state.heroSlides);
-    }, [state.siteSettings, state.heroSlides]);
+        setSettings(state.site_settings);
+        setSlides(state.hero_slides);
+    }, [state.site_settings, state.hero_slides]);
 
     const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -266,7 +266,7 @@ const AdminSettings: React.FC = () => {
                 <div className="bg-slate-700 p-6 rounded-lg">
                     <h2 className="text-xl font-bold mb-4">{t('admin.settings.social_media')}</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                        {Object.keys(state.siteSettings.social_links).map((key) => (
+                        {Object.keys(state.site_settings.social_links).map((key) => (
                             <div key={key}>
                                 <label className="capitalize block text-sm font-medium text-gray-300 mb-1">{key}</label>
                                 <div className="flex items-center gap-2">

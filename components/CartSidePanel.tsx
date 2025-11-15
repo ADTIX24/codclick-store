@@ -1,6 +1,6 @@
 import React from 'react';
-import { useAppContext } from '../state/AppContext';
-import { useLanguage } from '../i18n/LanguageContext';
+import { useAppContext } from '../state/AppContext.tsx';
+import { useLanguage } from '../i18n/LanguageContext.tsx';
 
 interface CartSidePanelProps {
     isOpen: boolean;
@@ -16,12 +16,14 @@ const CartSidePanel: React.FC<CartSidePanelProps> = ({ isOpen, onClose, onChecko
     const { t, dir } = useLanguage();
     const { cart } = state;
 
-    const subtotal = cart.reduce((sum, item) => {
+    const validCart = cart.filter(item => item && item.product);
+
+    const subtotal = validCart.reduce((sum, item) => {
         const price = parseFloat(item.product.price.replace(/[^0-9.-]+/g, ''));
         return sum + price * item.quantity;
     }, 0);
     
-    const currency = cart.length > 0 ? cart[0].product.price.replace(/[0-9.,\s]/g, '') : '$';
+    const currency = validCart.length > 0 ? validCart[0].product.price.replace(/[0-9.,\s]/g, '') : '$';
 
     return (
         <>
@@ -39,14 +41,14 @@ const CartSidePanel: React.FC<CartSidePanelProps> = ({ isOpen, onClose, onChecko
 
                     {/* Cart Items */}
                     <div className="flex-1 overflow-y-auto p-6">
-                        {cart.length === 0 ? (
+                        {validCart.length === 0 ? (
                             <div className="text-center text-gray-400 pt-20">
                                 <p className="text-lg font-semibold">{t('cart.empty_cart')}</p>
                                 <p>{t('cart.empty_cart_message')}</p>
                             </div>
                         ) : (
                             <ul className="space-y-4">
-                                {cart.map(item => (
+                                {validCart.map(item => (
                                     <li key={item.product.id} className="flex gap-4">
                                         <img src={item.product.image_urls[0]} alt={t(item.product.name)} className="w-20 h-20 object-cover rounded-md" />
                                         <div className="flex-1">
@@ -71,7 +73,7 @@ const CartSidePanel: React.FC<CartSidePanelProps> = ({ isOpen, onClose, onChecko
                     </div>
                     
                     {/* Footer */}
-                    {cart.length > 0 && (
+                    {validCart.length > 0 && (
                         <div className="p-6 border-t border-slate-700 bg-slate-800">
                             <div className="flex justify-between items-center mb-4 text-lg">
                                 <span className="font-semibold text-gray-300">{t('cart.subtotal')}:</span>

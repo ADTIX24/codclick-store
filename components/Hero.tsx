@@ -37,28 +37,28 @@ const getYouTubeEmbedUrl = (url?: string): string => {
 const Hero: React.FC<HeroProps> = ({ onShopNow }) => {
   const { t } = useLanguage();
   const { state } = useAppContext();
-  const { heroSlides, siteSettings } = state;
+  const { hero_slides, site_settings } = state;
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const nextSlide = useCallback(() => {
-    if(heroSlides.length > 0) {
-      setCurrentSlide(prev => (prev + 1) % heroSlides.length);
+    if(hero_slides.length > 0) {
+      setCurrentSlide(prev => (prev + 1) % hero_slides.length);
     }
-  }, [heroSlides.length]);
+  }, [hero_slides.length]);
 
   useEffect(() => {
-    if (heroSlides.length > 1) {
-      const currentSlideData = heroSlides[currentSlide];
-      const duration = (currentSlideData?.duration || siteSettings.slide_interval) * 1000;
+    if (hero_slides.length > 1) {
+      const currentSlideData = hero_slides[currentSlide];
+      const duration = (currentSlideData?.duration || site_settings.slide_interval) * 1000;
       
       const timer = setTimeout(nextSlide, duration);
 
       return () => clearTimeout(timer);
     }
-  }, [currentSlide, heroSlides, siteSettings.slide_interval, nextSlide]);
+  }, [currentSlide, hero_slides, site_settings.slide_interval, nextSlide]);
 
 
-  if (heroSlides.length === 0) {
+  if (hero_slides.length === 0) {
     return (
         <section className="relative h-[60vh] sm:h-[80vh] w-full text-white overflow-hidden bg-slate-800 flex items-center justify-center">
              <div className="text-center">
@@ -73,11 +73,11 @@ const Hero: React.FC<HeroProps> = ({ onShopNow }) => {
     setCurrentSlide(index);
   };
   
-  const activeSlide = heroSlides[currentSlide];
+  const activeSlide = hero_slides[currentSlide];
 
   return (
     <section className="relative h-[60vh] sm:h-[80vh] w-full text-white overflow-hidden">
-      {heroSlides.map((slide, index) => (
+      {hero_slides.map((slide, index) => (
         <div
           key={slide.id}
           className={`absolute inset-0 transition-opacity duration-1000 ${index === currentSlide ? 'opacity-100' : 'opacity-0'}`}
@@ -130,7 +130,7 @@ const Hero: React.FC<HeroProps> = ({ onShopNow }) => {
       </div>
 
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex space-x-3">
-        {heroSlides.map((_, index) => (
+        {hero_slides.map((_, index) => (
           <button
             key={index}
             onClick={() => goToSlide(index)}

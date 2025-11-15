@@ -18,11 +18,11 @@ const ShieldIcon: React.FC = () => ( <svg xmlns="http://www.w3.org/2000/svg" cla
 
 const Header: React.FC = () => {
     const { t } = useLanguage();
-    const { state, navigateTo, logout, setCartOpen, setCheckoutOpen } = useAppContext();
+    const { state, navigateTo, logout, setCartOpen, setCheckoutOpen, setSearchTerm } = useAppContext();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     
-    const { logo_url } = state.siteSettings;
-    const { currentUser, cart, isCartOpen, isCheckoutOpen } = state;
+    const { logo_url } = state.site_settings;
+    const { current_user, cart, is_cart_open, is_checkout_open, search_term, current_page } = state;
 
     const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -35,130 +35,130 @@ const Header: React.FC = () => {
         e.preventDefault();
         handleNav(page);
     };
-    
-    const handleLogout = () => {
-        logout();
-        setIsMenuOpen(false);
-    };
 
-    const handleOpenCheckout = () => {
-        setCartOpen(false);
-        setCheckoutOpen(true);
+    const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (search_term.trim()) {
+            navigateTo('products');
+        }
     };
+    
+    const NavLink: React.FC<{ page: PageKey; children: React.ReactNode }> = ({ page, children }) => (
+        <a href="#" onClick={(e) => handleNavClick(e, page)} className={`px-3 py-2 rounded-md text-sm font-medium ${current_page === page ? 'text-amber-400' : 'text-gray-300 hover:bg-slate-700 hover:text-white'}`}>
+            {children}
+        </a>
+    );
 
     return (
         <>
-            <header className="bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40 border-b border-slate-700/50">
+            <header className="bg-slate-800/80 backdrop-blur-sm sticky top-0 z-30 border-b border-slate-700/50">
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-20">
-                        {/* Logo */}
-                        <div className="flex-shrink-0">
-                            <a href="#" onClick={(e) => handleNavClick(e, 'home')} className="text-2xl font-bold text-amber-400">
-                               {logo_url ? <img src={logo_url} alt="CODCLICK Logo" className="h-10 w-auto" /> : 'CODCLICK'}
+                        {/* Logo and Mobile Menu Button */}
+                        <div className="flex items-center">
+                            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="lg:hidden p-2 rounded-md text-gray-400 hover:text-white hover:bg-slate-700">
+                                {isMenuOpen ? <CloseIcon /> : <MenuIcon />}
+                            </button>
+                            <a href="#" onClick={(e) => handleNavClick(e, 'home')} className="flex-shrink-0 ml-4 lg:ml-0">
+                                {logo_url ? <img src={logo_url} alt="CODCLICK Logo" className="h-10 w-auto" /> : <span className="text-2xl font-bold text-amber-400">CODCLICK</span>}
                             </a>
                         </div>
-
-                        {/* Desktop Search */}
-                        <div className="hidden md:flex flex-1 items-center justify-center px-8 lg:px-16">
-                            <div className="relative w-full max-w-lg">
-                                <input
-                                    type="search"
-                                    placeholder={t('header.search_placeholder')}
-                                    className="bg-slate-700/50 text-white rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 w-full transition-all"
-                                />
-                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <SearchIcon />
-                                </div>
+                        
+                        {/* Desktop Search Bar */}
+                        <div className="hidden lg:flex flex-1 justify-center px-8">
+                            <div className="w-full max-w-lg">
+                                <form onSubmit={handleSearch} className="relative">
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                        <SearchIcon />
+                                    </div>
+                                    <input
+                                        type="search"
+                                        value={search_term}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="block w-full rounded-full border-0 bg-slate-700 py-2.5 pr-10 pl-4 text-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-amber-500 sm:text-sm"
+                                        placeholder={t('header.search_placeholder')}
+                                    />
+                                </form>
                             </div>
                         </div>
 
-                        {/* Actions: Auth & Cart */}
-                        <div className="hidden md:flex items-center justify-end space-x-4">
-                            {currentUser ? (
-                                <>
-                                    {currentUser.role === 'owner' && (
-                                        <button onClick={() => handleNav('admin')} className="p-2 rounded-full hover:bg-slate-700 transition-colors" title="Admin Dashboard" aria-label="Admin Dashboard">
-                                            <ShieldIcon />
-                                        </button>
-                                    )}
-                                    <button onClick={() => handleNav('my_account')} className="text-base font-medium text-gray-300 hover:text-amber-400 transition-colors whitespace-nowrap">{t('header.my_account')}</button>
-                                    <div className="h-4 w-px bg-slate-600"></div>
-                                    <button onClick={handleLogout} className="text-base font-medium text-gray-300 hover:text-amber-400 transition-colors whitespace-nowrap">{t('header.logout')}</button>
-                                </>
-                            ) : (
-                                <>
-                                    <button onClick={() => navigateTo('auth', null, 'login')} className="text-base font-medium text-gray-300 hover:text-amber-400 transition-colors whitespace-nowrap ml-4">{t('header.login')}</button>
-                                    <button onClick={() => navigateTo('auth', null, 'signup')} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2 px-4 rounded-full text-sm transition-colors whitespace-nowrap">{t('header.signup')}</button>
-                                </>
-                            )}
-                            <div className="h-6 w-px bg-slate-600"></div>
-                            <button id="cart-icon-target" onClick={() => setCartOpen(true)} className="relative text-gray-300 hover:text-amber-400 transition-colors p-2">
-                                <CartIcon />
-                                {cartItemCount > 0 && (
-                                    <span className="absolute top-0 right-0 -mt-1 -mr-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-                                        {cartItemCount}
-                                    </span>
+                        {/* Actions */}
+                        <div className="flex items-center gap-4">
+                            <div className="hidden lg:flex items-center gap-2">
+                                {current_user ? (
+                                    <>
+                                        <NavLink page={current_user.role === 'owner' || current_user.role === 'moderator' ? 'admin' : 'my_account'}>{t('header.my_account')}</NavLink>
+                                        <button onClick={logout} className="px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-slate-700 hover:text-white">{t('header.logout')}</button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <NavLink page="auth">{t('header.login')}</NavLink>
+                                        <button onClick={() => navigateTo('auth', null, 'signup')} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2 px-4 rounded-full text-sm transition-colors">{t('header.signup')}</button>
+                                    </>
                                 )}
-                            </button>
-                        </div>
+                            </div>
 
-                        {/* Mobile Menu Button */}
-                        <div className="md:hidden flex items-center">
-                             <button id="cart-icon-target-mobile" onClick={() => setCartOpen(true)} className="relative text-gray-300 hover:text-amber-400 transition-colors p-2 mr-2">
+                            <button id="cart-icon-target" onClick={() => setCartOpen(true)} className="relative text-gray-300 hover:text-amber-400 p-2">
                                 <CartIcon />
-                                {cartItemCount > 0 && (
-                                    <span className="absolute top-0 right-0 -mt-1 -mr-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-                                        {cartItemCount}
-                                    </span>
-                                )}
-                            </button>
-                            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-gray-300 hover:text-white p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-500">
-                                <span className="sr-only">Open main menu</span>
-                                {isMenuOpen ? <CloseIcon /> : <MenuIcon />}
+                                {cartItemCount > 0 && <span className="absolute top-0 right-0 block h-5 w-5 rounded-full text-center text-xs font-bold bg-amber-500 text-slate-900">{cartItemCount}</span>}
                             </button>
                         </div>
                     </div>
                 </div>
 
                 {/* Mobile Menu */}
-                <div className={`${isMenuOpen ? 'block' : 'hidden'} md:hidden`}>
-                    <div className="pt-4 pb-3 border-t border-slate-700 space-y-4">
-                         <div className="relative w-full px-5">
-                            <input
-                                type="search"
-                                placeholder={t('header.search_placeholder')}
-                                className="bg-slate-700/50 text-white rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 w-full"
-                            />
-                             <div className="absolute inset-y-0 left-0 pl-8 flex items-center pointer-events-none">
-                                <SearchIcon />
+                {isMenuOpen && (
+                    <div className="lg:hidden">
+                        <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                            <div className="p-2">
+                                 <form onSubmit={handleSearch} className="relative">
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                        <SearchIcon />
+                                    </div>
+                                    <input
+                                        type="search"
+                                        value={search_term}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="block w-full rounded-full border-0 bg-slate-700 py-2 pr-10 pl-4 text-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-amber-500 sm:text-sm"
+                                        placeholder={t('header.search_placeholder')}
+                                    />
+                                </form>
                             </div>
-                        </div>
-                        <div className="flex items-center justify-center px-5 space-x-4">
-                            {currentUser ? (
-                                 <>
-                                    {currentUser.role === 'owner' && (
-                                        <button onClick={() => handleNav('admin')} className="p-2 rounded-full hover:bg-slate-700 transition-colors" title="Admin Dashboard" aria-label="Admin Dashboard">
-                                            <ShieldIcon />
-                                        </button>
-                                    )}
-                                    <button onClick={() => handleNav('my_account')} className="text-base font-medium text-gray-300 hover:text-amber-400 transition-colors">{t('header.my_account')}</button>
-                                    <div className="h-4 w-px bg-slate-600"></div>
-                                    <button onClick={handleLogout} className="text-base font-medium text-gray-300 hover:text-amber-400 transition-colors">{t('header.logout')}</button>
+
+                            <NavLink page="home">الرئيسية</NavLink>
+                            <NavLink page="products">{t('header.all_cards')}</NavLink>
+                            
+                            <div className="border-t border-slate-700 my-2"></div>
+                            
+                             {current_user ? (
+                                <>
+                                    <NavLink page={current_user.role === 'owner' || current_user.role === 'moderator' ? 'admin' : 'my_account'}>{t('header.my_account')}</NavLink>
+                                    <button onClick={() => { logout(); setIsMenuOpen(false); }} className="block w-full text-right px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-slate-700 hover:text-white">{t('header.logout')}</button>
                                 </>
                             ) : (
-                                 <>
-                                    <button onClick={() => { navigateTo('auth', null, 'login'); setIsMenuOpen(false); }} className="text-base font-medium text-gray-300 hover:text-amber-400 transition-colors ml-4">{t('header.login')}</button>
-                                    <button onClick={() => { navigateTo('auth', null, 'signup'); setIsMenuOpen(false); }} className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2 px-4 rounded-full text-sm transition-colors">{t('header.signup')}</button>
+                                <>
+                                    <NavLink page="auth">{t('header.login')}</NavLink>
+                                    <button onClick={() => { navigateTo('auth', null, 'signup'); setIsMenuOpen(false); }} className="block w-full text-right px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-slate-700 hover:text-white">{t('header.signup')}</button>
                                 </>
                             )}
                         </div>
                     </div>
-                </div>
+                )}
             </header>
-            <CartSidePanel isOpen={isCartOpen} onClose={() => setCartOpen(false)} onCheckout={handleOpenCheckout} />
-            <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setCheckoutOpen(false)} />
+            <CartSidePanel 
+                isOpen={is_cart_open}
+                onClose={() => setCartOpen(false)}
+                onCheckout={() => {
+                    setCartOpen(false);
+                    setCheckoutOpen(true);
+                }}
+            />
+            <CheckoutModal 
+                isOpen={is_checkout_open}
+                onClose={() => setCheckoutOpen(false)}
+            />
         </>
     );
 };
-
+// FIX: Added default export to resolve module import error.
 export default Header;

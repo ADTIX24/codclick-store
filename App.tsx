@@ -17,7 +17,15 @@ import { useAppContext } from './state/AppContext.tsx';
 
 const HomePage: React.FC = () => {
   const { state, navigateTo } = useAppContext();
-  const { homepageSections } = state;
+  const { homepage_sections, categories, loading } = state;
+
+  if (loading && homepage_sections.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-amber-500" role="status" aria-label="Loading..."></div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -25,7 +33,7 @@ const HomePage: React.FC = () => {
       <div className="bg-transparent">
         <div className="relative">
           <div className="absolute inset-0 bg-grid-slate-700/40 [mask-image:linear-gradient(to_bottom,white_20%,transparent_75%)]"></div>
-          {homepageSections.filter(s => s.visible).map(section => {
+          {homepage_sections.filter(s => s.visible).map(section => {
               switch(section.type) {
                   case 'category_grid':
                       return <CategoryGrid key={section.id} title={section.title} subtitle={section.subtitle} />;
@@ -51,16 +59,16 @@ const HomePage: React.FC = () => {
 
 const App: React.FC = () => {
   const { state } = useAppContext();
-  const { currentPage, currentCategoryId, currentUser } = state;
+  const { current_page, current_category_id, current_user } = state;
 
   const renderPage = () => {
-    switch (currentPage) {
+    switch (current_page) {
       case 'home':
         return <HomePage />;
       case 'products':
         return <ProductsPage />;
       case 'category':
-        return <ProductsPage categoryId={currentCategoryId} />;
+        return <ProductsPage categoryId={current_category_id} />;
       case 'product_detail':
         return <ProductDetailPage />;
       case 'auth':
@@ -68,7 +76,7 @@ const App: React.FC = () => {
       case 'my_account':
         return <StaticPage pageKey="my_account" />;
       case 'admin':
-        if (currentUser?.role === 'owner' || currentUser?.role === 'moderator') {
+        if (current_user?.role === 'owner' || current_user?.role === 'moderator') {
           return <AdminPage />;
         }
         return <HomePage />; // Redirect home if not admin
@@ -80,7 +88,7 @@ const App: React.FC = () => {
       case 'contact':
       case 'blog':
       case 'business':
-        return <StaticPage pageKey={currentPage} />;
+        return <StaticPage pageKey={current_page} />;
       default:
         return <HomePage />;
     }

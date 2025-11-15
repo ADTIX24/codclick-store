@@ -17,8 +17,8 @@ const AdminSections: React.FC = () => {
     const [editingSection, setEditingSection] = useState<HomepageSection | null>(null);
 
     useEffect(() => {
-        setSections(state.homepageSections);
-    }, [state.homepageSections]);
+        setSections(state.homepage_sections);
+    }, [state.homepage_sections]);
 
     const handleMove = (index: number, direction: 'up' | 'down') => {
         const newSections = [...sections];

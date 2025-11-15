@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useAppContext } from '../../state/AppContext';
 import type { Order, OrderItem } from '../../types';
@@ -32,7 +32,8 @@ const ManualSendModal: React.FC<{
     React.useEffect(() => {
         if (order) {
             const initialContent: DeliveryContentState = {};
-            order.order_items.forEach(item => {
+            (order.order_items || []).forEach(item => {
+                if (!item || !item.product) return;
                 const existingContent = order.manual_delivery_data?.[item.id];
                 if (Array.isArray(existingContent)) {
                     initialContent[item.id] = existingContent.join('\n');
@@ -55,7 +56,7 @@ const ManualSendModal: React.FC<{
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const deliveryData: { [itemId: string]: string | string[] } = {};
-        for (const itemId in deliveryContent) {
+        for (const itemId of Object.keys(deliveryContent)) {
             const content = deliveryContent[itemId];
             if (content.includes('\n')) {
                 deliveryData[itemId] = content.split('\n').filter(c => c.trim() !== '');
@@ -71,25 +72,35 @@ const ManualSendModal: React.FC<{
             <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl p-6 border border-slate-700 text-right" onClick={e => e.stopPropagation()}>
                 <h2 className="text-2xl font-bold mb-6">{t('admin.orders.edit_delivery_content_title')} - #{order.id.slice(-6)}</h2>
                 <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-                    {order.order_items.map(item => (
-                        <div key={item.id} className="bg-slate-700 p-4 rounded-lg">
-                            <div className="flex items-center gap-4 mb-2">
-                                <img src={item.product.image_urls[0]} alt={t(item.product.name)} className="w-12 h-12 object-cover rounded" />
-                                <div>
-                                    <p className="font-semibold text-white">{t(item.product.name)}</p>
-                                    <p className="text-sm text-gray-400">Qty: {item.quantity}</p>
+                    {(order.order_items || []).map(item => {
+                        if (!item || !item.product) {
+                            return (
+                                <div key={item?.id || Math.random()} className="bg-slate-700 p-4 rounded-lg">
+                                    <p className="font-semibold text-red-400">Product Not Found</p>
+                                    <p className="text-sm text-gray-500">This product may have been deleted.</p>
                                 </div>
+                            );
+                        }
+                        return (
+                            <div key={item.id} className="bg-slate-700 p-4 rounded-lg">
+                                <div className="flex items-center gap-4 mb-2">
+                                    <img src={item.product.image_urls[0]} alt={t(item.product.name)} className="w-12 h-12 object-cover rounded" />
+                                    <div>
+                                        <p className="font-semibold text-white">{t(item.product.name)}</p>
+                                        <p className="text-sm text-gray-400">Qty: {item.quantity}</p>
+                                    </div>
+                                </div>
+                                <label htmlFor={`item-content-${item.id}`} className="block text-sm font-semibold text-gray-300 mb-1">{t('admin.orders.product_content_label')}</label>
+                                <textarea
+                                    id={`item-content-${item.id}`}
+                                    value={deliveryContent[item.id] || ''}
+                                    onChange={(e) => handleContentChange(item.id, e.target.value)}
+                                    className="w-full bg-slate-800 p-2 rounded border border-slate-600 h-24"
+                                    placeholder="Enter code or URL. For multiple codes, use one per line."
+                                />
                             </div>
-                            <label htmlFor={`item-content-${item.id}`} className="block text-sm font-semibold text-gray-300 mb-1">{t('admin.orders.product_content_label')}</label>
-                            <textarea
-                                id={`item-content-${item.id}`}
-                                value={deliveryContent[item.id] || ''}
-                                onChange={(e) => handleContentChange(item.id, e.target.value)}
-                                className="w-full bg-slate-800 p-2 rounded border border-slate-600 h-24"
-                                placeholder="Enter code or URL. For multiple codes, use one per line."
-                            />
-                        </div>
-                    ))}
+                        )
+                    })}
                     <div className="flex justify-start gap-4 pt-4">
                         <button type="submit" className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-2 px-6 rounded-full text-sm">{t('admin.orders.save_and_send')}</button>
                         <button type="button" onClick={onClose} className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-6 rounded-full text-sm">{t('admin.products.cancel')}</button>
@@ -102,11 +113,31 @@ const ManualSendModal: React.FC<{
 
 const AdminOrders: React.FC = () => {
     const { t } = useLanguage();
-    const { state, updateOrderStatus, updateOrderDelivery } = useAppContext();
-    const { orders } = state;
+    const { updateOrderStatus, updateOrderDelivery } = useAppContext();
+    const [orders, setOrders] = useState<Order[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [isProofLoading, setIsProofLoading] = useState<string | null>(null);
+
+    const fetchOrders = async () => {
+        setIsLoading(true);
+        const { data, error } = await supabaseClient
+            .from('orders')
+            .select('id, user_id, created_at, order_items, total, status, customer_name, customer_email, customer_whatsapp, payment_method, payment_proof_url, manual_delivery_data')
+            .order('created_at', { ascending: false });
+        if (error) {
+            console.error("Error fetching orders:", error);
+            alert(`Could not fetch orders. RLS policies might be missing.\n\nError: ${error.message}`);
+        } else {
+            setOrders(data || []);
+        }
+        setIsLoading(false);
+    };
+
+    useEffect(() => {
+        fetchOrders();
+    }, []);
 
     const openManualSendModal = (order: Order) => {
         setSelectedOrder(order);
@@ -120,6 +151,16 @@ const AdminOrders: React.FC = () => {
         } else {
             setIsModalOpen(false);
             setSelectedOrder(null);
+            fetchOrders(); // Refresh orders after update
+        }
+    };
+    
+    const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
+        const { error } = await updateOrderStatus(orderId, newStatus);
+        if (error) {
+            alert(`Failed to update status: ${error.message}`);
+        } else {
+            setOrders(prevOrders => prevOrders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
         }
     };
 
@@ -130,21 +171,10 @@ const AdminOrders: React.FC = () => {
         try {
             const url = new URL(proofUrl);
             const path = url.pathname.split('/order_proofs/')[1];
-            if (!path) {
-                throw new Error('Could not extract file path from URL.');
-            }
+            if (!path) throw new Error('Could not extract file path from URL.');
 
-            // Create a signed URL that expires in 1 minute
-            const { data, error } = await supabaseClient
-                .storage
-                .from('order_proofs')
-                .createSignedUrl(path, 60);
-
-            if (error) {
-                throw error;
-            }
-
-            // Open the signed URL in a new tab
+            const { data, error } = await supabaseClient.storage.from('order_proofs').createSignedUrl(path, 60);
+            if (error) throw error;
             window.open(data.signedUrl, '_blank');
         } catch (error: any) {
             console.error('Error creating signed URL:', error);
@@ -154,6 +184,9 @@ const AdminOrders: React.FC = () => {
         }
     };
 
+    if (isLoading) {
+        return <div className="text-center p-10">Loading orders...</div>;
+    }
 
     return (
         <div className="bg-slate-800 p-6 rounded-lg text-right">
@@ -186,7 +219,7 @@ const AdminOrders: React.FC = () => {
                                     <td className="p-4 space-y-2">
                                         <select 
                                             value={order.status} 
-                                            onChange={async (e) => await updateOrderStatus(order.id, e.target.value as Order['status'])}
+                                            onChange={(e) => handleStatusChange(order.id, e.target.value as Order['status'])}
                                             className="bg-slate-600 border border-slate-500 text-white text-sm rounded-lg focus:ring-amber-500 focus:border-amber-500 block w-full p-2"
                                         >
                                             <option value="Payment Pending">{t('admin.orders.status_pending')}</option>
@@ -217,18 +250,27 @@ const AdminOrders: React.FC = () => {
                                     <td className="p-4 text-center"><StatusBadge status={order.status} /></td>
                                     <td className="p-4 font-mono text-amber-400">{order.total.toFixed(2)}$</td>
                                     <td className="p-4 text-sm text-gray-300">
-                                        {order.order_items.map(item => (
-                                            <div key={item.id}>
-                                                {item.quantity}x {t(item.product.name)}
-                                            </div>
-                                        ))}
+                                        {(order.order_items || []).map(item => {
+                                            if (!item || !item.product) {
+                                                return (
+                                                    <div key={item?.id || Math.random()} className="text-red-400 text-xs">
+                                                        Product Not Found
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <div key={item.id}>
+                                                    {item.quantity}x {t(item.product.name)}
+                                                </div>
+                                            );
+                                        })}
                                     </td>
                                     <td className="p-4">
-                                        <div className="font-semibold text-white">{order.customerName}</div>
-                                        <div className="text-xs text-gray-400">{order.customerEmail}</div>
-                                        <div className="text-xs text-gray-400">{order.customerWhatsapp}</div>
+                                        <div className="font-semibold text-white">{order.customer_name}</div>
+                                        <div className="text-xs text-gray-400">{order.customer_email}</div>
+                                        <div className="text-xs text-gray-400">{order.customer_whatsapp}</div>
                                     </td>
-                                    <td className="p-4 text-sm text-gray-400">{new Date(order.date).toLocaleDateString()}</td>
+                                    <td className="p-4 text-sm text-gray-400">{isNaN(new Date(order.created_at).getTime()) ? '-' : new Date(order.created_at).toLocaleDateString()}</td>
                                     <td className="p-4 font-mono text-gray-400">#{order.id.slice(-6).toUpperCase()}</td>
                                 </tr>
                             ))}

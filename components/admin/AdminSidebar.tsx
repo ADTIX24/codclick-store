@@ -10,305 +10,331 @@ const UsersIcon: React.FC = () => <svg xmlns="http://www.w3.org/2000/svg" classN
 const SectionsIcon: React.FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" /></svg>;
 const PaymentIcon: React.FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>;
 const SettingsIcon: React.FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
-const PagesIcon: React.FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0011.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>;
-const GuideIcon: React.FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>;
-const ReturnIcon: React.FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h12" /></svg>;
-
+const PagesIcon: React.FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>;
+const LogoutIcon: React.FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>;
 
 interface AdminSidebarProps {
     activePage: string;
     onNavigate: (page: string) => void;
 }
 
-const AdminSidebar: React.FC<AdminSidebarProps> = ({ activePage, onNavigate }) => {
-    const { t } = useLanguage();
-    const { navigateTo } = useAppContext();
-    const [isGuideOpen, setIsGuideOpen] = useState(false);
-    const [copyStatus, setCopyStatus] = useState(false);
+const setupScript = `
+-- CODCLICK SUPABASE SETUP SCRIPT (v22 - Final RLS & Function Fix)
+-- This version fixes the circular dependency in RLS policies by reading the user role
+-- directly from auth.users, ensuring reliable data fetching for admins.
 
+BEGIN;
 
-    const navItems = [
-        { id: 'dashboard', label: t('admin.dashboard.title'), icon: <DashboardIcon /> },
-        { id: 'products', label: t('admin.products.title'), icon: <ProductsIcon /> },
-        { id: 'orders', label: t('admin.orders.title'), icon: <OrdersIcon /> },
-        { id: 'users', label: t('admin.users.title'), icon: <UsersIcon /> },
-        { id: 'sections', label: t('admin.sections.title'), icon: <SectionsIcon /> },
-        { id: 'payment', label: t('admin.payment.title'), icon: <PaymentIcon /> },
-        { id: 'pages', label: t('admin.pages.title'), icon: <PagesIcon /> },
-        { id: 'settings', label: t('admin.settings.title'), icon: <SettingsIcon /> },
-    ];
+-- PART 0: PRE-FLIGHT CLEANUP (Drop policies, functions, triggers, etc.)
+----------------------------------------------------------------
+DO $$ DECLARE
+    tbl_name TEXT;
+    pol_name TEXT;
+BEGIN
+    -- Drop all RLS policies on public tables
+    FOR tbl_name IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP
+        FOR pol_name IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = tbl_name LOOP
+            EXECUTE 'DROP POLICY IF EXISTS ' || quote_ident(pol_name) || ' ON public.' || quote_ident(tbl_name) || ' CASCADE;';
+        END LOOP;
+        -- Disable RLS on the table to ensure we can work with it
+        EXECUTE 'ALTER TABLE public.' || quote_ident(tbl_name) || ' DISABLE ROW LEVEL SECURITY';
+    END LOOP;
+    -- Drop storage policies
+    EXECUTE 'DROP POLICY IF EXISTS "Allow public read access on storage" ON storage.objects CASCADE;';
+    EXECUTE 'DROP POLICY IF EXISTS "Allow admin full access to product storage" ON storage.objects CASCADE;';
+    EXECUTE 'DROP POLICY IF EXISTS "Allow authenticated users to upload proofs" ON storage.objects CASCADE;';
+    EXECUTE 'DROP POLICY IF EXISTS "Allow owners/admins to read proofs" ON storage.objects CASCADE;';
+END $$;
+
+-- Now that policies are gone, we can safely drop dependent objects
+DROP VIEW IF EXISTS public.users CASCADE;
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP TRIGGER IF EXISTS on_auth_user_updated ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
+DROP FUNCTION IF EXISTS public.update_user_role_and_meta(uuid, text, text) CASCADE;
+DROP FUNCTION IF EXISTS public.get_my_role() CASCADE;
+DROP FUNCTION IF EXISTS public.apply_public_read_admin_write_policy(text) CASCADE;
+
+-- PART 1: DATA PRESERVATION & TABLE REBUILD
+----------------------------------------------------------------
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'user_profiles') THEN
+    RAISE NOTICE 'Backing up user_profiles...';
+    CREATE TEMP TABLE user_profiles_temp AS TABLE public.user_profiles;
+    RAISE NOTICE 'Dropping old user_profiles table...';
+    DROP TABLE public.user_profiles CASCADE;
+  END IF;
+  IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'orders') THEN
+    RAISE NOTICE 'Backing up orders...';
+    CREATE TEMP TABLE orders_temp AS TABLE public.orders;
+    RAISE NOTICE 'Dropping old orders table...';
+    DROP TABLE public.orders CASCADE;
+  END IF;
+END $$;
+
+create table public.user_profiles ( id uuid primary key, full_name text, whatsapp text, role text default 'customer' not null, email text unique );
+create table public.orders ( id uuid primary key default gen_random_uuid(), user_id uuid, created_at timestamp with time zone default now(), order_items jsonb, total real not null, status text not null, customer_name text, customer_email text, customer_whatsapp text, payment_method text, payment_proof_url text, manual_delivery_data jsonb );
+
+-- PART 1.5: ROBUST DATA RESTORATION WITH SANITIZATION
+----------------------------------------------------------------
+DO $$
+DECLARE
+  full_name_col_select TEXT;
+  uuid_regex TEXT := '^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$';
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'user_profiles_temp' AND relpersistence = 't') THEN
+    RAISE NOTICE 'Restoring sanitized data to new user_profiles table...';
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_profiles_temp' and column_name = 'full_name') THEN
+      full_name_col_select := 'full_name';
+    ELSIF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_profiles_temp' and column_name = 'fullName') THEN
+      full_name_col_select := '"fullName"';
+    ELSE
+      full_name_col_select := 'NULL';
+    END IF;
+
+    EXECUTE 'INSERT INTO public.user_profiles (id, full_name, whatsapp, role, email) SELECT id::uuid, ' || full_name_col_select || ', whatsapp, role, email FROM user_profiles_temp WHERE id::text ~* ''' || uuid_regex || ''' ON CONFLICT (id) DO NOTHING';
     
-    const supabaseSetupSQL = `-- 1. Create helper function to check admin role (MUST be created before policies that use it)
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS boolean
-LANGUAGE sql
-SECURITY DEFINER
-AS $$
-  SELECT COALESCE(auth.jwt() -> 'user_metadata' ->> 'role', 'customer') IN ('owner', 'moderator');
+    DROP TABLE user_profiles_temp;
+  END IF;
+END $$;
+
+DO $$
+DECLARE
+  insert_sql TEXT;
+  old_date_column_exists BOOLEAN;
+  customer_name_col_select TEXT;
+  customer_email_col_select TEXT;
+  customer_whatsapp_col_select TEXT;
+  uuid_regex TEXT := '^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$';
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'orders_temp' AND relpersistence = 't') THEN
+    RAISE NOTICE 'Restoring sanitized data to new orders table...';
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders_temp' AND column_name='customer_name') THEN customer_name_col_select := 'customer_name'; ELSE customer_name_col_select := 'NULL'; END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders_temp' AND column_name='customer_email') THEN customer_email_col_select := 'customer_email'; ELSE customer_email_col_select := 'NULL'; END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders_temp' AND column_name='customer_whatsapp') THEN customer_whatsapp_col_select := 'customer_whatsapp'; ELSE customer_whatsapp_col_select := 'NULL'; END IF;
+    SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders_temp' and column_name='date') INTO old_date_column_exists;
+    
+    insert_sql := 'INSERT INTO public.orders (id, user_id, created_at, order_items, total, status, customer_name, customer_email, customer_whatsapp, payment_method, payment_proof_url, manual_delivery_data) SELECT ' ||
+      'id::uuid, ' ||
+      '(CASE WHEN user_id::text ~* ''' || uuid_regex || ''' THEN user_id::uuid ELSE NULL END), ' ||
+      (CASE WHEN old_date_column_exists THEN 'COALESCE(created_at, date::timestamptz), ' ELSE 'created_at, ' END) ||
+      'order_items, total, status, ' ||
+      customer_name_col_select || ', ' ||
+      customer_email_col_select || ', ' ||
+      customer_whatsapp_col_select || ', ' ||
+      'payment_method, payment_proof_url, manual_delivery_data FROM orders_temp ' ||
+      'WHERE id::text ~* ''' || uuid_regex || ''' ON CONFLICT (id) DO NOTHING;';
+    
+    RAISE NOTICE 'Executing restore: %', insert_sql;
+    EXECUTE insert_sql;
+    DROP TABLE orders_temp;
+  END IF;
+END $$;
+
+
+-- PART 2: REBUILD OTHER TABLES & CONSTRAINTS (with snake_case)
+----------------------------------------------------------------
+create table if not exists public.categories ( id uuid primary key default gen_random_uuid(), name text not null, image_url text, created_at timestamp with time zone default now() );
+create table if not exists public.products ( id uuid primary key default gen_random_uuid(), category_id uuid, name text not null, price text not null, image_urls text[] default '{}', description text, rating real default 5.0, delivery_type text not null, delivery_content jsonb, created_at timestamp with time zone default now() );
+create table if not exists public.site_settings ( id int primary key default 1, logo_url text, slide_interval int, social_links jsonb, app_download_link text, copyright_text text, payment_methods jsonb, constraint single_row check (id = 1) );
+create table if not exists public.hero_slides ( id uuid primary key default gen_random_uuid(), title text, subtitle text, type text, image_url text, video_url text, youtube_url text, duration int, created_at timestamp with time zone default now() );
+create table if not exists public.pages ( id text primary key, content jsonb, updated_at timestamp with time zone default now() );
+create table if not exists public.homepage_sections ( id uuid primary key default gen_random_uuid(), index int not null, type text not null, title text, subtitle text, category_id uuid, visible boolean default true );
+
+ALTER TABLE public.user_profiles DROP CONSTRAINT IF EXISTS user_profiles_id_fkey;
+ALTER TABLE public.products DROP CONSTRAINT IF EXISTS products_category_id_fkey;
+ALTER TABLE public.orders DROP CONSTRAINT IF EXISTS orders_user_id_fkey;
+ALTER TABLE public.homepage_sections DROP CONSTRAINT IF EXISTS homepage_sections_category_id_fkey;
+
+ALTER TABLE public.user_profiles ADD CONSTRAINT user_profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+ALTER TABLE public.products ADD CONSTRAINT products_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id) ON DELETE CASCADE;
+ALTER TABLE public.orders ADD CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.user_profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.homepage_sections ADD CONSTRAINT homepage_sections_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.categories(id) ON DELETE SET NULL;
+
+-- PART 3: REBUILD FUNCTIONS, TRIGGERS, VIEWS
+----------------------------------------------------------------
+-- This function now reads the role directly from auth.users to avoid RLS circular dependencies.
+create or replace function public.get_my_role()
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    return 'anon';
+  end if;
+  return (
+    select raw_user_meta_data->>'role'
+    from auth.users
+    where id = auth.uid()
+  );
+end;
 $$;
 
--- 2. Create RPC function to update user role and metadata (for Admin Users page)
-CREATE OR REPLACE FUNCTION public.update_user_role_and_meta(user_id uuid, new_role text, new_full_name text)
-RETURNS void
-LANGUAGE sql
-SECURITY DEFINER
-AS $$
-  UPDATE auth.users
-  SET
-    raw_user_meta_data = raw_user_meta_data || jsonb_build_object('role', new_role, 'full_name', new_full_name)
-  WHERE id = user_id;
-$$;
+create or replace function public.handle_new_user() returns trigger language plpgsql security definer as $$ begin insert into public.user_profiles (id, full_name, email, whatsapp, role) values ( new.id, new.raw_user_meta_data->>'full_name', new.email, new.raw_user_meta_data->>'whatsapp', coalesce(new.raw_user_meta_data->>'role', 'customer') ) on conflict (id) do update set full_name = new.raw_user_meta_data->>'full_name', email = new.email, whatsapp = new.raw_user_meta_data->>'whatsapp', role = coalesce(new.raw_user_meta_data->>'role', 'customer'); return new; end; $$;
+create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.handle_new_user();
 
+create or replace function public.update_user_role_and_meta(user_id uuid, new_role text, new_full_name text) 
+returns void 
+language plpgsql 
+security definer as $$ 
+begin 
+  if not (public.get_my_role() IN ('owner', 'moderator')) then 
+    raise exception 'Only admins can change user roles.'; 
+  end if; 
+  update auth.users 
+  set raw_user_meta_data = raw_user_meta_data || jsonb_build_object('role', new_role, 'full_name', new_full_name) 
+  where id = user_id; 
+  update public.user_profiles 
+  set role = new_role, full_name = new_full_name 
+  where id = user_id; 
+end; $$;
 
--- 3. Create a table for site settings
-CREATE TABLE IF NOT EXISTS public.site_settings (
-    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    logo_url TEXT,
-    slide_interval INT,
-    social_links JSONB,
-    app_download_link TEXT,
-    copyright_text TEXT,
-    payment_methods JSONB,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+create or replace view public.users as select id, full_name, email, whatsapp, role from public.user_profiles;
 
--- 4. Create tables for products and categories
-CREATE TABLE IF NOT EXISTS public.categories (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
-    image_url TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- PART 4: RE-APPLY RLS
+----------------------------------------------------------------
+create or replace function apply_public_read_admin_write_policy(table_name_param text) returns void as $$ begin execute format(' ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY; DROP POLICY IF EXISTS "Allow public read access" ON public.%I; CREATE POLICY "Allow public read access" ON public.%I FOR SELECT USING (true); DROP POLICY IF EXISTS "Allow admin full access" ON public.%I; CREATE POLICY "Allow admin full access" ON public.%I FOR ALL USING (public.get_my_role() in (''owner'', ''moderator'')); ', table_name_param, table_name_param, table_name_param, table_name_param, table_name_param); end; $$ language plpgsql;
 
-CREATE TABLE IF NOT EXISTS public.products (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    category_id UUID REFERENCES public.categories(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    price TEXT NOT NULL,
-    image_urls TEXT[],
-    description TEXT,
-    rating NUMERIC(2,1),
-    delivery_type TEXT,
-    delivery_content JSONB,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+alter table public.user_profiles enable row level security;
+drop policy if exists "Admins can manage all profiles" on public.user_profiles;
+create policy "Admins can manage all profiles" on public.user_profiles for all using (public.get_my_role() in ('owner', 'moderator'));
+drop policy if exists "Users can view their own profile" on public.user_profiles;
+create policy "Users can view their own profile" on public.user_profiles for select using (auth.uid()::uuid = id);
+drop policy if exists "Users can update their own profile" on public.user_profiles;
+create policy "Users can update their own profile" on public.user_profiles for update using (auth.uid()::uuid = id) with check (auth.uid()::uuid = id);
 
--- 5. Create table for hero slides
-CREATE TABLE IF NOT EXISTS public.hero_slides (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    title TEXT,
-    subtitle TEXT,
-    type TEXT,
-    image_url TEXT,
-    video_url TEXT,
-    youtube_url TEXT,
-    duration INT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+alter table public.orders enable row level security;
+drop policy if exists "Admins can manage all orders" on public.orders;
+create policy "Admins can manage all orders" on public.orders for all using (public.get_my_role() in ('owner', 'moderator'));
+drop policy if exists "Users can manage their own orders" on public.orders;
+create policy "Users can manage their own orders" on public.orders for all using (auth.uid()::uuid = user_id);
 
--- 6. Create table for static pages
-CREATE TABLE IF NOT EXISTS public.pages (
-    id TEXT PRIMARY KEY,
-    title_key TEXT,
-    content JSONB,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+select apply_public_read_admin_write_policy('categories');
+select apply_public_read_admin_write_policy('products');
+select apply_public_read_admin_write_policy('site_settings');
+select apply_public_read_admin_write_policy('hero_slides');
+select apply_public_read_admin_write_policy('pages');
+select apply_public_read_admin_write_policy('homepage_sections');
 
--- 7. Create table for homepage sections
-CREATE TABLE IF NOT EXISTS public.homepage_sections (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    index INT,
-    type TEXT,
-    title TEXT,
-    subtitle TEXT,
-    category_id UUID,
-    visible BOOLEAN,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- PART 5: STORAGE POLICIES
+------------------------------------------------
+drop policy if exists "Allow public read access on storage" on storage.objects;
+create policy "Allow public read access on storage" on storage.objects for select using ( bucket_id IN ('product_images', 'product_files', 'order_proofs') );
+drop policy if exists "Allow admin full access to product storage" on storage.objects;
+create policy "Allow admin full access to product storage" on storage.objects for all using ( bucket_id IN ('product_images', 'product_files') and public.get_my_role() in ('owner', 'moderator') );
+drop policy if exists "Allow authenticated users to upload proofs" on storage.objects;
+create policy "Allow authenticated users to upload proofs" on storage.objects for insert to authenticated with check (bucket_id = 'order_proofs');
+drop policy if exists "Allow owners/admins to read proofs" on storage.objects;
+-- FINAL FIX: Cast owner_id (text) to uuid to correctly compare with auth.uid() (uuid).
+create policy "Allow owners/admins to read proofs" on storage.objects for select to authenticated using ( bucket_id = 'order_proofs' and (public.get_my_role() in ('owner', 'moderator') OR owner_id::uuid = auth.uid()::uuid) );
 
--- 8. Create table for orders
-CREATE TABLE IF NOT EXISTS public.orders (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id),
-    date TIMESTAMPTZ DEFAULT NOW(),
-    order_items JSONB,
-    total NUMERIC,
-    status TEXT,
-    customer_name TEXT,
-    customer_email TEXT,
-    customer_whatsapp TEXT,
-    payment_method TEXT,
-    payment_proof_url TEXT,
-    manual_delivery_data JSONB
-);
-
--- 9. Add columns if they don't exist using a more direct method
-ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS app_download_link TEXT;
-ALTER TABLE public.site_settings ADD COLUMN IF NOT EXISTS payment_methods JSONB;
-ALTER TABLE public.products ADD COLUMN IF NOT EXISTS delivery_content JSONB;
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS order_items JSONB;
-
-
--- 10. Enable Row Level Security (RLS) for all tables
-ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.hero_slides ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.pages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.homepage_sections ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
-
--- 11. Drop existing policies to avoid conflicts
-DROP POLICY IF EXISTS "Allow public read-only access" ON public.site_settings;
-DROP POLICY IF EXISTS "Allow admins full access" ON public.site_settings;
-DROP POLICY IF EXISTS "Allow public read-only access" ON public.categories;
-DROP POLICY IF EXISTS "Allow admins full access" ON public.categories;
-DROP POLICY IF EXISTS "Allow public read-only access" ON public.products;
-DROP POLICY IF EXISTS "Allow admins full access" ON public.products;
-DROP POLICY IF EXISTS "Allow public read-only access" ON public.hero_slides;
-DROP POLICY IF EXISTS "Allow admins full access" ON public.hero_slides;
-DROP POLICY IF EXISTS "Allow public read-only access" ON public.pages;
-DROP POLICY IF EXISTS "Allow admins full access" ON public.pages;
-DROP POLICY IF EXISTS "Allow public read-only access" ON public.homepage_sections;
-DROP POLICY IF EXISTS "Allow admins full access" ON public.homepage_sections;
-DROP POLICY IF EXISTS "Allow read access to own orders" ON public.orders;
-DROP POLICY IF EXISTS "Allow admins to access all orders" ON public.orders;
-DROP POLICY IF EXISTS "Allow users to create their own orders" ON public.orders;
-DROP POLICY IF EXISTS "Allow admins full access on orders" ON public.orders;
-
--- 12. Create RLS Policies for Public Read Access
-CREATE POLICY "Allow public read-only access" ON public.site_settings FOR SELECT USING (true);
-CREATE POLICY "Allow public read-only access" ON public.categories FOR SELECT USING (true);
-CREATE POLICY "Allow public read-only access" ON public.products FOR SELECT USING (true);
-CREATE POLICY "Allow public read-only access" ON public.hero_slides FOR SELECT USING (true);
-CREATE POLICY "Allow public read-only access" ON public.pages FOR SELECT USING (true);
-CREATE POLICY "Allow public read-only access" ON public.homepage_sections FOR SELECT USING (true);
-
--- 13. Create RLS Policies for Orders (Users and Admins)
-CREATE POLICY "Allow read access to own orders" ON public.orders FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Allow users to create their own orders" ON public.orders FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Allow admins to access all orders" ON public.orders FOR SELECT USING (public.is_admin());
-
--- 14. Create RLS policies for Admin Full Access (ALL operations)
-CREATE POLICY "Allow admins full access" ON public.site_settings FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
-CREATE POLICY "Allow admins full access" ON public.categories FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
-CREATE POLICY "Allow admins full access" ON public.products FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
-CREATE POLICY "Allow admins full access" ON public.hero_slides FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
-CREATE POLICY "Allow admins full access" ON public.pages FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
-CREATE POLICY "Allow admins full access" ON public.homepage_sections FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
-CREATE POLICY "Allow admins full access on orders" ON public.orders FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
-
--- 15. Drop and Create Storage Policies
-DROP POLICY IF EXISTS "Allow public read access on product_images" ON storage.objects;
-DROP POLICY IF EXISTS "Allow admin write access on product_images" ON storage.objects;
-DROP POLICY IF EXISTS "Allow public read access on product_files" ON storage.objects;
-DROP POLICY IF EXISTS "Allow admin write access on product_files" ON storage.objects;
-DROP POLICY IF EXISTS "Allow authenticated users to upload proofs" ON storage.objects;
-DROP POLICY IF EXISTS "Allow admin to read proofs" ON storage.objects;
-
--- Policies for product_images
-CREATE POLICY "Allow public read access on product_images" ON storage.objects FOR SELECT USING ( bucket_id = 'product_images' );
-CREATE POLICY "Allow admin write access on product_images" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'product_images' AND public.is_admin() );
-
--- Policies for product_files
-CREATE POLICY "Allow public read access on product_files" ON storage.objects FOR SELECT USING ( bucket_id = 'product_files' );
-CREATE POLICY "Allow admin write access on product_files" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'product_files' AND public.is_admin() );
-
--- Policies for order_proofs
-CREATE POLICY "Allow authenticated users to upload proofs" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'order_proofs' AND auth.role() = 'authenticated' );
-CREATE POLICY "Allow admin to read proofs" ON storage.objects FOR SELECT USING ( bucket_id = 'order_proofs' AND public.is_admin() );
-
--- 16. Insert default row into settings if it doesn't exist
-INSERT INTO public.site_settings (id) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM public.site_settings WHERE id = 1);
+COMMIT;
 `;
 
-    const handleCopy = () => {
-        navigator.clipboard.writeText(supabaseSetupSQL);
-        setCopyStatus(true);
-        setTimeout(() => setCopyStatus(false), 2000);
+
+const NavItem: React.FC<{
+    icon: React.ReactNode;
+    label: string;
+    isActive: boolean;
+    onClick: () => void;
+}> = ({ icon, label, isActive, onClick }) => (
+    <button
+        onClick={onClick}
+        className={`flex items-center gap-3 w-full text-right p-3 rounded-lg transition-colors ${isActive ? 'bg-amber-500/10 text-amber-400' : 'hover:bg-slate-700/50 text-gray-300'}`}
+    >
+        {icon}
+        <span className="font-semibold">{label}</span>
+    </button>
+);
+
+
+const AdminSidebar: React.FC<AdminSidebarProps> = ({ activePage, onNavigate }) => {
+    const { t } = useLanguage();
+    const { logout } = useAppContext();
+    const [isSetupGuideOpen, setIsSetupGuideOpen] = useState(false);
+    const [copySuccess, setCopySuccess] = useState(false);
+
+    const handleCopyScript = () => {
+        navigator.clipboard.writeText(setupScript.trim());
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
     };
 
-    const renderGuideModal = () => {
-        if (!isGuideOpen) return null;
-        return (
-            <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setIsGuideOpen(false)}>
-                <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-4xl border border-slate-700 text-right" onClick={e => e.stopPropagation()}>
-                    <div className="p-6 border-b border-slate-700">
-                        <h2 className="text-2xl font-bold">دليل إعداد قاعدة البيانات Supabase</h2>
-                        <p className="text-gray-400 mt-2">لتشغيل لوحة التحكم بشكل كامل، يجب عليك إعداد قاعدة البيانات والتخزين. اتبع الخطوات التالية بالترتيب.</p>
-                    </div>
-                    <div className="p-6 max-h-[70vh] overflow-y-auto">
-                        <div className="mb-8">
-                             <h3 className="text-xl font-bold text-amber-400 mb-3">الخطوة الأولى (يدوية): إنشاء مجلدات التخزين (Storage Buckets)</h3>
-                             <p className="text-gray-400 mb-4">يجب إنشاء المجلدات التالية يدوياً من لوحة تحكم Supabase. اذهب إلى قسم "Storage" في مشروعك.</p>
-                             <ul className="list-disc list-inside space-y-3 text-gray-300">
-                                <li>
-                                    <strong>المجلد الأول:</strong> أنشئ مجلداً باسم <code className="bg-slate-700 text-amber-300 px-1 rounded">product_images</code> وتأكد من تفعيل خيار <strong className="text-green-400">"Public bucket"</strong> (مهم لعرض الصور).
-                                </li>
-                                 <li>
-                                    <strong>المجلد الثاني:</strong> أنشئ مجلداً باسم <code className="bg-slate-700 text-amber-300 px-1 rounded">product_files</code> وتأكد من تفعيل خيار <strong className="text-green-400">"Public bucket"</strong> (مهم لتسليم الملفات).
-                                </li>
-                                 <li>
-                                    <strong>المجلد الثالث:</strong> أنشئ مجلداً باسم <code className="bg-slate-700 text-amber-300 px-1 rounded">order_proofs</code> وتأكد من <strong className="text-red-400">عدم تفعيل</strong> خيار "Public bucket" (للحفاظ على خصوصية إثباتات الدفع).
-                                </li>
-                             </ul>
-                        </div>
-                        <div>
-                             <h3 className="text-xl font-bold text-amber-400 mb-3">الخطوة الثانية: تشغيل كود SQL</h3>
-                             <p className="text-gray-400 mb-4">اذهب إلى "SQL Editor" في مشروعك، الصق الكود التالي بالكامل، ثم اضغط "Run". يمكنك تشغيل هذا الكود بأمان حتى لو قمت بتشغيله من قبل.</p>
-                             <div className="relative bg-slate-900 rounded-lg">
-                                <pre className="text-sm text-left whitespace-pre-wrap text-green-300 font-mono p-4 max-h-64 overflow-y-auto"><code>{supabaseSetupSQL}</code></pre>
-                                <button onClick={handleCopy} className="absolute top-4 right-4 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-1 px-3 rounded-full text-xs">
-                                   {copyStatus ? 'تم النسخ!' : 'نسخ الكود'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                     <div className="p-4 bg-slate-800/50 border-t border-slate-700 flex justify-start">
-                        <button onClick={() => setIsGuideOpen(false)} className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-6 rounded-full text-sm">إغلاق</button>
-                    </div>
-                </div>
-            </div>
-        );
-    };
+    const navItems = [
+        { key: 'dashboard', icon: <DashboardIcon />, label: t('admin.dashboard.title') },
+        { key: 'products', icon: <ProductsIcon />, label: t('admin.products.title') },
+        { key: 'orders', icon: <OrdersIcon />, label: t('admin.orders.title') },
+        { key: 'users', icon: <UsersIcon />, label: t('admin.users.title') },
+        { key: 'sections', icon: <SectionsIcon />, label: t('admin.sections.title') },
+        { key: 'payment', icon: <PaymentIcon />, label: t('admin.payment.title') },
+        { key: 'settings', icon: <SettingsIcon />, label: t('admin.settings.title') },
+        { key: 'pages', icon: <PagesIcon />, label: t('admin.pages.title') },
+    ];
 
     return (
         <>
-            {renderGuideModal()}
-            <aside className="md:w-64 flex-shrink-0 bg-slate-800 p-4 rounded-lg border border-slate-700 self-start">
-                <nav className="space-y-2">
-                    {navItems.map(item => (
-                        <button
-                            key={item.id}
-                            onClick={() => onNavigate(item.id)}
-                            className={`flex items-center gap-3 w-full text-right p-3 rounded-lg transition-colors ${
-                                activePage === item.id 
-                                ? 'bg-amber-500/10 text-amber-400' 
-                                : 'hover:bg-slate-700/50 text-gray-300'
-                            }`}
-                        >
-                            {item.icon}
-                            <span className="font-semibold">{item.label}</span>
-                        </button>
-                    ))}
-                    <div className="pt-4 mt-4 border-t border-slate-700 space-y-2">
-                         <button
-                            onClick={() => setIsGuideOpen(true)}
-                            className="flex items-center gap-3 w-full text-right p-3 rounded-lg transition-colors hover:bg-slate-700/50 text-gray-300"
-                        >
-                            <GuideIcon />
-                            <span className="font-semibold">دليل الإعداد</span>
-                        </button>
-                        <button
-                            onClick={() => navigateTo('home')}
-                            className="flex items-center gap-3 w-full text-right p-3 rounded-lg transition-colors hover:bg-slate-700/50 text-gray-300"
-                        >
-                           <ReturnIcon />
-                            <span className="font-semibold">العودة للموقع</span>
-                        </button>
+            <aside className="md:w-64 flex-shrink-0">
+                <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 h-full flex flex-col">
+                    <div className="space-y-2 flex-1">
+                        {navItems.map(item => (
+                             <NavItem 
+                                key={item.key}
+                                icon={item.icon} 
+                                label={item.label}
+                                isActive={activePage === item.key}
+                                onClick={() => onNavigate(item.key)} 
+                             />
+                        ))}
                     </div>
-                </nav>
+                    <div className="border-t border-slate-700 pt-4 mt-4 space-y-2">
+                        <button 
+                            onClick={() => setIsSetupGuideOpen(true)}
+                            className="w-full text-center p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm text-gray-300 font-semibold"
+                        >
+                            دليل إعداد Supabase
+                        </button>
+                        <NavItem 
+                            icon={<LogoutIcon />} 
+                            label={t('header.logout')}
+                            isActive={false}
+                            onClick={logout} 
+                        />
+                    </div>
+                </div>
             </aside>
+
+             {isSetupGuideOpen && (
+                <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setIsSetupGuideOpen(false)}>
+                    <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-3xl p-6 border border-slate-700 text-right" onClick={e => e.stopPropagation()}>
+                        <h2 className="text-2xl font-bold mb-4">دليل إعداد قاعدة بيانات Supabase</h2>
+                        <p className="text-gray-400 mb-6">
+                            لتشغيل الموقع بشكل صحيح، يرجى نسخ وتنفيذ هذا السكربت بالكامل في <code className="bg-slate-900 text-amber-400 px-1 rounded">SQL Editor</code> داخل مشروعك في Supabase. سيقوم السكربت بإعداد الجداول، الصلاحيات، والوظائف اللازمة.
+                        </p>
+                        <div className="relative">
+                            <textarea
+                                readOnly
+                                value={setupScript.trim()}
+                                className="w-full h-80 bg-slate-900 text-gray-300 font-mono text-sm p-4 rounded-lg border border-slate-700 resize-none"
+                                dir="ltr"
+                            />
+                             <button
+                                onClick={handleCopyScript}
+                                className="absolute top-2 left-2 bg-slate-600 hover:bg-slate-500 text-white font-semibold py-1 px-3 rounded text-xs"
+                            >
+                                {copySuccess ? 'تم النسخ!' : 'نسخ السكربت'}
+                            </button>
+                        </div>
+                        <div className="mt-6 text-left">
+                             <button onClick={() => setIsSetupGuideOpen(false)} className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-6 rounded-full text-sm">إغلاق</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };

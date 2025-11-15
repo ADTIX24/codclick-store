@@ -33,11 +33,13 @@ const StatusBadge: React.FC<{ status: Order['status'] }> = ({ status }) => {
 const StaticPage: React.FC<{ pageKey: PageKey }> = ({ pageKey }) => {
   const { t } = useLanguage();
   const { state, navigateTo, updateUser, changePassword } = useAppContext();
-  const { currentUser, orders } = state;
+  const { current_user: currentUser } = state;
   
   // --- My Account Page Logic ---
   const [activeTab, setActiveTab] = useState('details');
-  const [formData, setFormData] = useState({ fullName: '', email: '', whatsapp: '' });
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [formData, setFormData] = useState({ full_name: '', email: '', whatsapp: '' });
   const [passwordData, setPasswordData] = useState({ new: '', confirm: '' });
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
@@ -47,12 +49,33 @@ const StaticPage: React.FC<{ pageKey: PageKey }> = ({ pageKey }) => {
   useEffect(() => {
     if (pageKey === 'my_account' && currentUser) {
       setFormData({
-        fullName: currentUser.fullName,
+        full_name: currentUser.full_name,
         email: currentUser.email,
         whatsapp: currentUser.whatsapp || '',
       });
     }
   }, [currentUser, pageKey]);
+
+  useEffect(() => {
+      const fetchOrders = async () => {
+          if (activeTab === 'orders' && currentUser && orders.length === 0) {
+              setOrdersLoading(true);
+              const { data, error } = await supabaseClient
+                  .from('orders')
+                  .select('*')
+                  .eq('user_id', currentUser.id)
+                  .order('created_at', { ascending: false });
+              
+              if (error) {
+                  console.error("Error fetching user orders:", error);
+              } else {
+                  setOrders(data || []);
+              }
+              setOrdersLoading(false);
+          }
+      };
+      fetchOrders();
+  }, [activeTab, currentUser, orders.length]);
   
   const handleCopy = (text: string, codeId: string) => {
     navigator.clipboard.writeText(text);
@@ -63,14 +86,13 @@ const StaticPage: React.FC<{ pageKey: PageKey }> = ({ pageKey }) => {
   const handleInfoSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!currentUser) return;
-      if (!formData.fullName || !formData.email) {
+      if (!formData.full_name || !formData.email) {
         setMessage({type: 'error', text: t('my_account_page.fields_required')});
         return;
       }
 
-      // We only update metadata fields that the user can change
       const { error } = await updateUser({
-          fullName: formData.fullName,
+          full_name: formData.full_name,
           whatsapp: formData.whatsapp,
       });
       
@@ -150,7 +172,7 @@ const StaticPage: React.FC<{ pageKey: PageKey }> = ({ pageKey }) => {
                                     <form onSubmit={handleInfoSubmit} className="space-y-4">
                                         <div>
                                             <label className="block text-sm text-gray-400 mb-1">{t('my_account_page.full_name')}</label>
-                                            <input type="text" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} className="w-full bg-slate-700 p-2 rounded border border-slate-600" />
+                                            <input type="text" value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} className="w-full bg-slate-700 p-2 rounded border border-slate-600" />
                                         </div>
                                         <div>
                                             <label className="block text-sm text-gray-400 mb-1">{t('my_account_page.email')}</label>
@@ -186,7 +208,9 @@ const StaticPage: React.FC<{ pageKey: PageKey }> = ({ pageKey }) => {
                         {activeTab === 'orders' && (
                              <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
                                 <h2 className="text-2xl font-bold mb-6">{t('my_account_page.orders_title')}</h2>
-                                {orders.length > 0 ? (
+                                {ordersLoading ? (
+                                    <div className="text-center py-10">Loading orders...</div>
+                                ) : orders.length > 0 ? (
                                     <div className="space-y-4">
                                         {orders.map(order => (
                                             <div key={order.id} className="bg-slate-700/50 rounded-lg border border-slate-600 overflow-hidden">
@@ -196,7 +220,7 @@ const StaticPage: React.FC<{ pageKey: PageKey }> = ({ pageKey }) => {
                                                 >
                                                     <div className="flex-1">
                                                         <p className="font-bold text-white">{t('my_account_page.order_id')}: <span className="font-mono">#{order.id.slice(-8).toUpperCase()}</span></p>
-                                                        <p className="text-sm text-gray-400">{t('my_account_page.date')}: {new Date(order.date).toLocaleDateString()}</p>
+                                                        <p className="text-sm text-gray-400">{t('my_account_page.date')}: {isNaN(new Date(order.created_at).getTime()) ? '-' : new Date(order.created_at).toLocaleDateString()}</p>
                                                     </div>
                                                     <div className="flex-1 text-right">
                                                         <p className="font-semibold text-amber-400">{t('my_account_page.total')}: {order.total.toFixed(2)}$</p>
@@ -210,19 +234,34 @@ const StaticPage: React.FC<{ pageKey: PageKey }> = ({ pageKey }) => {
                                                         <h3 className="text-lg font-semibold mb-4">{t('my_account_page.products_in_order')}</h3>
                                                         <ul className="space-y-6">
                                                             {order.order_items.map(item => {
+                                                                if (!item || !item.product) {
+                                                                    return (
+                                                                        <li key={item?.id || Math.random()} className="pb-6 border-b border-slate-700 last:border-b-0 last:pb-0">
+                                                                            <div className="flex items-start gap-4">
+                                                                                <div className="w-16 h-20 bg-slate-700 rounded-md flex items-center justify-center text-gray-500 text-3xl font-bold">?</div>
+                                                                                <div className="flex-1 pt-2">
+                                                                                    <p className="font-semibold text-gray-400">Product Not Found</p>
+                                                                                    <p className="text-sm text-gray-500">This product is no longer available.</p>
+                                                                                </div>
+                                                                            </div>
+                                                                        </li>
+                                                                    );
+                                                                }
+                                                                const product = item.product;
+
                                                                 const manualContent = order.manual_delivery_data?.[item.id];
                                                                 const isCompleted = order.status === 'Completed';
                                                                 const isDelivered = manualContent || isCompleted;
                                                                 
-                                                                const deliveryContent = manualContent || item.product.delivery_content;
-                                                                const deliveryType = item.product.delivery_type;
+                                                                const deliveryContent = manualContent || product.delivery_content;
+                                                                const deliveryType = product.delivery_type;
 
                                                                 return (
                                                                     <li key={item.id} className="pb-6 border-b border-slate-700 last:border-b-0 last:pb-0">
                                                                         <div className="flex items-start gap-4">
-                                                                            <img src={item.product.image_urls[0]} alt={t(item.product.name)} className="w-16 h-20 object-cover rounded-md" />
+                                                                            <img src={product.image_urls[0]} alt={t(product.name)} className="w-16 h-20 object-cover rounded-md" />
                                                                             <div className="flex-1">
-                                                                                <p className="font-semibold text-white">{t(item.product.name)}</p>
+                                                                                <p className="font-semibold text-white">{t(product.name)}</p>
                                                                                 <p className="text-sm text-gray-400">{t('admin.orders.products')}: {item.quantity}</p>
                                                                             </div>
                                                                         </div>

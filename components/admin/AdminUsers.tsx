@@ -1,23 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 // FIX: Added .tsx extension to module import.
 import { useLanguage } from '../../i18n/LanguageContext.tsx';
 // FIX: Added .tsx extension to module import.
 import { useAppContext } from '../../state/AppContext.tsx';
 // FIX: Added .ts extension to module import.
 import type { User, UserRole } from '../../types.ts';
+import { supabaseClient } from '../../supabase/client.ts';
 
 const AdminUsers: React.FC = () => {
     const { t } = useLanguage();
-    const { state, updateUserRole } = useAppContext();
-    const { users } = state;
-
+    const { updateUserRole } = useAppContext();
+    const [users, setUsers] = useState<User[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [formData, setFormData] = useState({ fullName: '', email: '', role: 'customer' as UserRole });
+    
+    const fetchUsers = async () => {
+        setIsLoading(true);
+        const { data, error } = await supabaseClient.from('user_profiles').select('*');
+        if (error) {
+            console.error("Error fetching users:", error);
+            alert(`Could not fetch users. RLS policies might be missing.\n\nError: ${error.message}`);
+        } else {
+            setUsers(data as User[] || []);
+        }
+        setIsLoading(false);
+    };
+
+    useEffect(() => {
+        fetchUsers();
+    }, []);
 
     const openEditModal = (user: User) => {
         setSelectedUser(user);
-        setFormData({ fullName: user.fullName, email: user.email, role: user.role });
+        setFormData({ fullName: user.full_name, email: user.email, role: user.role });
         setIsModalOpen(true);
     };
 
@@ -33,6 +50,7 @@ const AdminUsers: React.FC = () => {
             if (error) {
                 alert(`Failed to update user: ${error.message}`);
             } else {
+                fetchUsers(); // Refresh users list
                 closeModal();
             }
         }
@@ -95,6 +113,10 @@ const AdminUsers: React.FC = () => {
         );
     };
 
+    if (isLoading) {
+        return <div className="text-center p-10">Loading users...</div>;
+    }
+
     return (
         <div className="bg-slate-800 p-6 rounded-lg">
             {renderModal()}
@@ -122,7 +144,7 @@ const AdminUsers: React.FC = () => {
                                     </span>
                                 </td>
                                  <td className="p-4 text-gray-300">{user.email}</td>
-                                <td className="p-4 text-white font-medium">{user.fullName}</td>
+                                <td className="p-4 text-white font-medium">{user.full_name}</td>
                             </tr>
                         ))}
                     </tbody>

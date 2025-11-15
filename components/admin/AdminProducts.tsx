@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 // FIX: Added .tsx extension to module import.
 import { useAppContext } from '../../state/AppContext.tsx';
 // FIX: Added .tsx extension to module import.
@@ -33,7 +33,7 @@ interface ConfirmState {
 }
 
 const AdminProducts: React.FC = () => {
-    const { state, addCategory, updateCategory, deleteCategory, addProduct, updateProduct, deleteProduct } = useAppContext();
+    const { state, addCategory, updateCategory, deleteCategory, addProduct, updateProduct, deleteProduct, fetchAllData } = useAppContext();
     const { t } = useLanguage();
 
     const [modalState, setModalState] = useState<ModalState>({ isOpen: false, mode: null, data: undefined });
@@ -50,20 +50,44 @@ const AdminProducts: React.FC = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [modalError, setModalError] = useState('');
 
+    useEffect(() => {
+        fetchAllData();
+    }, [fetchAllData]);
 
-    const openModal = (mode: ModalMode, data?: any) => {
+
+    const openModal = async (mode: ModalMode, data?: any) => {
+        let fullData = { ...data }; // Create a mutable copy
+    
+        // If editing a product, fetch its full data to get delivery_content
+        if (mode === 'editProduct' && data?.id) {
+            try {
+                const { data: productDetails, error } = await supabaseClient
+                    .from('products')
+                    .select('delivery_content')
+                    .eq('id', data.id)
+                    .single();
+
+                if (error) throw error;
+                
+                fullData.delivery_content = productDetails.delivery_content;
+            } catch (error) {
+                console.error("Failed to fetch full product details for editing:", error);
+                setModalError("تحذير: لم نتمكن من تحميل محتوى التسليم. قد يؤدي حفظ التغييرات إلى مسح الأكواد الموجودة.");
+            }
+        }
+
         // Reset and set display images
-        if ((mode === 'editProduct' || mode === 'addProduct') && data?.image_urls) {
-            setImageUrls(data.image_urls);
-        } else if (mode === 'editCategory' && data?.image_url) {
-            setImageUrls([data.image_url]);
+        if ((mode === 'editProduct' || mode === 'addProduct') && fullData?.image_urls) {
+            setImageUrls(fullData.image_urls);
+        } else if (mode === 'editCategory' && fullData?.image_url) {
+            setImageUrls([fullData.image_url]);
         } else {
             setImageUrls([]);
         }
 
-        // Reset and set delivery content
+        // Reset and set delivery content from the potentially updated fullData
         if (mode === 'editProduct' || mode === 'addProduct') {
-            const product = data as Product;
+            const product = fullData as Product;
             const type = product?.delivery_type || 'code';
             setDeliveryType(type);
 
@@ -71,7 +95,7 @@ const AdminProducts: React.FC = () => {
                 setDeliveryFile(product?.delivery_content as string || '');
                 setDeliveryCodes('');
             } else { // code
-                setDeliveryCodes(Array.isArray(product?.delivery_content) ? product.delivery_content.join('\n') : '');
+                setDeliveryCodes(Array.isArray(product?.delivery_content) ? product.delivery_content.join('\n') : (product?.delivery_content as string || ''));
                 setDeliveryFile('');
             }
         } else {
@@ -80,8 +104,10 @@ const AdminProducts: React.FC = () => {
              setDeliveryCodes('');
         }
         
-        setModalError('');
-        setModalState({ isOpen: true, mode, data });
+        // Don't clear a warning error that might have been set during data fetching
+        if (modalError === '') setModalError('');
+        
+        setModalState({ isOpen: true, mode, data: fullData });
     };
 
     const closeModal = () => {
@@ -131,7 +157,6 @@ const AdminProducts: React.FC = () => {
                     rating: parseFloat(values.rating as string),
                     delivery_type: deliveryType,
                     delivery_content: finalDeliveryContent,
-// FIX: Add missing 'created_at' property to satisfy the Product type.
                     created_at: (modalState.data as Product)?.created_at || new Date().toISOString(),
                 };
 

@@ -3,18 +3,42 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../i18n/LanguageContext.tsx';
 // FIX: Added .tsx extension to module import.
 import { useAppContext } from '../state/AppContext.tsx';
-import { supabaseClient } from '../supabase/client.ts';
+
+const EyeIcon: React.FC = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+  </svg>
+);
+
+const EyeOffIcon: React.FC = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7 1.274-4.057 5.064-7 9.542-7 .847 0 1.673.12 2.468.352M7.11 7.11a5.98 5.98 0 018.38 8.38M12 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+  </svg>
+);
+
 
 const AuthPage: React.FC = () => {
-    const { t } = useLanguage();
+    const { t, dir } = useLanguage();
     const { navigateTo, login, signup, state } = useAppContext();
-    const { authMode } = state;
+    const { auth_mode, current_user } = state;
 
-    const [isLogin, setIsLogin] = useState(authMode === 'login');
+    const [isLogin, setIsLogin] = useState(auth_mode === 'login');
+    const [passwordVisible, setPasswordVisible] = useState(false);
+    const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
 
     useEffect(() => {
-        setIsLogin(authMode === 'login');
-    }, [authMode]);
+        setIsLogin(auth_mode === 'login');
+    }, [auth_mode]);
+
+    useEffect(() => {
+        if (current_user) {
+            // If user is logged in, navigate away from auth page
+            const userRole = current_user.role;
+            navigateTo(userRole === 'owner' || userRole === 'moderator' ? 'admin' : 'home');
+        }
+    }, [current_user, navigateTo]);
 
 
     const [fullName, setFullName] = useState('');
@@ -44,50 +68,45 @@ const AuthPage: React.FC = () => {
         setSuccessMessage('');
         setLoading(true);
 
-        if (isLogin) {
-            if (!email || !password) {
-                setError(t('auth.fields_required'));
-                setLoading(false);
-                return;
-            }
-            const { error: loginError } = await login(email, password);
-            if (loginError) {
-                setError(loginError.message || t('auth.invalid_credentials'));
+        try {
+            if (isLogin) {
+                if (!email || !password) {
+                    setError(t('auth.fields_required'));
+                    return;
+                }
+                const { error: loginError } = await login(email, password);
+                if (loginError) {
+                    setError(loginError.message || t('auth.invalid_credentials'));
+                }
+                // Navigation is now handled by the useEffect hook watching current_user
             } else {
-                // onAuthStateChange will set the user state. We just need to navigate.
-                // We need to fetch the user to get metadata for role-based navigation.
-                const { data: { user } } = await supabaseClient.auth.getUser();
-                const userRole = user?.user_metadata?.role || 'customer';
-                navigateTo(userRole === 'owner' ? 'admin' : 'home');
-            }
-        } else {
-            // Signup implementation
-            if (!fullName || !email || !password || !confirmPassword) {
-                setError(t('auth.fields_required'));
-                setLoading(false);
-                return;
-            }
-            if (password !== confirmPassword) {
-                setError(t('auth.passwords_do_not_match'));
-                setLoading(false);
-                return;
-            }
-            
-            const { error: signupError } = await signup({ fullName, email, password, whatsapp });
+                // Signup implementation
+                if (!fullName || !email || !password || !confirmPassword) {
+                    setError(t('auth.fields_required'));
+                    return;
+                }
+                if (password !== confirmPassword) {
+                    setError(t('auth.passwords_do_not_match'));
+                    return;
+                }
+                
+                const { error: signupError } = await signup({ full_name: fullName, email, password, whatsapp });
 
-            if (signupError) {
-                 setError(signupError.message || t('auth.email_exists'));
-            } else {
-                setSuccessMessage(t('auth.signup_success'));
-                setFullName('');
-                setEmail('');
-                setWhatsapp('');
-                setPassword('');
-                setConfirmPassword('');
-                setIsLogin(true);
+                if (signupError) {
+                     setError(signupError.message || t('auth.email_exists'));
+                } else {
+                    setSuccessMessage(t('auth.signup_success'));
+                    setFullName('');
+                    setEmail('');
+                    setWhatsapp('');
+                    setPassword('');
+                    setConfirmPassword('');
+                    setIsLogin(true);
+                }
             }
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     return (
@@ -146,36 +165,50 @@ const AuthPage: React.FC = () => {
                                  />
                             </div>
                         )}
-                         <div className="mb-4">
+                         <div className="mb-4 relative">
                             <label htmlFor="password" className="sr-only">{t('auth.passwordLabel')}</label>
                             <input 
                                 id="password" 
                                 name="password" 
-                                type="password" 
+                                type={passwordVisible ? 'text' : 'password'}
                                 autoComplete={isLogin ? "current-password" : "new-password"}
                                 required 
-                                className="appearance-none rounded-md relative block w-full px-3 py-3 border border-slate-600 bg-slate-700/50 text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 focus:z-10 sm:text-sm text-left" 
+                                className={`appearance-none rounded-md relative block w-full py-3 ${dir === 'rtl' ? 'pr-3 pl-10' : 'pl-3 pr-10'} border border-slate-600 bg-slate-700/50 text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 focus:z-10 sm:text-sm text-left`} 
                                 placeholder={t('auth.passwordPlaceholder')}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 dir="ltr"
                             />
+                            <button
+                                type="button"
+                                className={`absolute inset-y-0 ${dir === 'rtl' ? 'left-0 pl-3' : 'right-0 pr-3'} flex items-center text-gray-400 hover:text-amber-400`}
+                                onClick={() => setPasswordVisible(!passwordVisible)}
+                            >
+                                {passwordVisible ? <EyeOffIcon /> : <EyeIcon />}
+                            </button>
                         </div>
                          {!isLogin && (
-                             <div className="mb-4">
+                             <div className="mb-4 relative">
                                 <label htmlFor="confirm-password" className="sr-only">{t('auth.confirmPasswordLabel')}</label>
                                 <input 
                                     id="confirm-password" 
                                     name="confirm-password" 
-                                    type="password" 
+                                    type={confirmPasswordVisible ? 'text' : 'password'} 
                                     autoComplete="new-password"
                                     required 
-                                    className="appearance-none rounded-md relative block w-full px-3 py-3 border border-slate-600 bg-slate-700/50 text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 focus:z-10 sm:text-sm text-left" 
-                                    placeholder={t('auth.passwordPlaceholder')} 
+                                    className={`appearance-none rounded-md relative block w-full py-3 ${dir === 'rtl' ? 'pr-3 pl-10' : 'pl-3 pr-10'} border border-slate-600 bg-slate-700/50 text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 focus:z-10 sm:text-sm text-left`} 
+                                    placeholder={t('auth.confirmPasswordLabel')} 
                                     dir="ltr"
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                 />
+                                <button
+                                    type="button"
+                                    className={`absolute inset-y-0 ${dir === 'rtl' ? 'left-0 pl-3' : 'right-0 pr-3'} flex items-center text-gray-400 hover:text-amber-400`}
+                                    onClick={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
+                                >
+                                    {confirmPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
+                                </button>
                             </div>
                         )}
                     </div>
