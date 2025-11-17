@@ -43,7 +43,7 @@ interface AppContextType {
   updatePage: (pageKey: PageKey, content: any) => Promise<{ error: any | null }>;
   upsertHomepageSections: (sections: HomepageSection[]) => Promise<{ error: any | null }>;
   setSearchTerm: (term: string) => void;
-  fetchAllData: () => Promise<void>;
+  fetchAllData: (user: User | null) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -167,67 +167,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return null;
   }, [state.categories]);
 
-  const fetchAllData = useCallback(async () => {
+  const fetchAllData = useCallback(async (user: User | null) => {
+    setLoading(true);
     try {
-        // --- STAGE 1: Fetch shell data for fast initial paint ---
-        setLoading(true);
-        
-        const [settingsRes, slidesRes, pagesRes, sectionsRes, categoriesRes] = await Promise.all([
+        // Fetch all data in parallel for everyone
+        const [settingsRes, slidesRes, pagesRes, sectionsRes, categoriesRes, productsRes] = await Promise.all([
             supabaseClient.from('site_settings').select('*').single(),
             supabaseClient.from('hero_slides').select('*').order('created_at', { ascending: true }),
             supabaseClient.from('pages').select('*'),
             supabaseClient.from('homepage_sections').select('*').order('index', { ascending: true }),
-            supabaseClient.from('categories').select('id, name, image_url').order('created_at', { ascending: true }),
+            supabaseClient.from('categories').select('id, name, image_url, created_at').order('created_at', { ascending: true }),
+            supabaseClient.from('products').select('*'),
         ]);
 
-        const settingsData = settingsRes.data;
-        const slidesData = slidesRes.data;
-        const pagesData = pagesRes.data;
-        const sectionsData = sectionsRes.data || [];
-        const categoriesOnlyData = (categoriesRes.data || []).map(cat => ({...cat, products: [] as Product[]}));
+        if (settingsRes.error) throw settingsRes.error;
+        if (slidesRes.error) throw slidesRes.error;
+        if (pagesRes.error) throw pagesRes.error;
+        if (sectionsRes.error) throw sectionsRes.error;
+        if (categoriesRes.error) throw categoriesRes.error;
+        if (productsRes.error) throw productsRes.error;
 
+        // Process settings
+        const siteSettings = settingsRes.data ? { ...initialAppState.site_settings, ...settingsRes.data } : initialAppState.site_settings;
+        
+        // Process slides
+        const heroSlides = slidesRes.data && slidesRes.data.length > 0 ? slidesRes.data : HERO_SLIDES;
+
+        // Process pages
         const pages: { [key in PageKey]?: PageContent } = { ...initialAppState.pages };
-        if(pagesData) {
-            pagesData.forEach((p: any) => {
+        if (pagesRes.data) {
+            pagesRes.data.forEach((p: any) => {
                 if (pages[p.id as PageKey]) pages[p.id as PageKey]!.content = p.content;
             });
         }
 
-        // Set state to unblock UI
+        // Process sections
+        const sectionsData = sectionsRes.data || [];
+
+        // Process categories and products
+        const categoriesData = categoriesRes.data || [];
+        const productsData = productsRes.data || [];
+        const categoriesWithProducts = categoriesData.map(cat => ({
+            ...cat,
+            products: productsData.filter(p => p.category_id === cat.id) as Product[]
+        }));
+
+        // Update state once with all data
         setState(prev => ({
             ...prev,
-            categories: categoriesOnlyData,
-            site_settings: settingsData ? { ...prev.site_settings, ...settingsData } : prev.site_settings,
-            hero_slides: slidesData && slidesData.length > 0 ? slidesData : HERO_SLIDES,
+            categories: categoriesWithProducts,
+            site_settings: siteSettings,
+            hero_slides: heroSlides,
             pages,
             homepage_sections: sectionsData,
-            loading: false, // <-- UI UNBLOCKED
+            loading: false,
         }));
-        
-        // --- STAGE 2: Fetch ALL products in the background ---
-        const { data: allProductsData, error: productsError } = await supabaseClient
-            .from('products')
-            .select('id, category_id, name, price, image_urls, description, rating, delivery_type, delivery_content, created_at');
-        
-        if (productsError) {
-            console.warn("Error fetching products in background:", productsError);
-            return;
-        }
-
-        // Update state with all products
-        setState(prev => {
-            const finalCategories = prev.categories.map(cat => ({
-                ...cat,
-                products: (allProductsData || []).filter(p => p.category_id === cat.id) as Product[]
-            }));
-            return { ...prev, categories: finalCategories };
-        });
 
     } catch (error) {
-        console.error("Error during data load:", error);
-        setState(prev => ({ ...prev, loading: false }));
+        console.error("Error fetching all data:", error);
+        setLoading(false);
     }
-  }, []);
+}, []);
+
 
   useEffect(() => {
     let isMounted = true;
@@ -250,7 +251,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       setState(prev => ({ ...prev, current_user: currentUser }));
-      await fetchAllData();
+      await fetchAllData(currentUser);
     };
 
     initializeSessionAndData();
@@ -270,10 +271,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       }
       
-      if (event === 'SIGNED_OUT') {
-          setState(prev => ({ ...prev, current_user: null, orders: [], users: [] }));
-      } else {
-          setState(prev => ({ ...prev, current_user: currentUser }));
+      setState(prev => ({ ...prev, current_user: currentUser }));
+      
+      // If user logs in or out, reload all data based on new role.
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        if (event === 'SIGNED_OUT') {
+            setState(prev => ({ ...prev, orders: [], users: [] }));
+        }
+        await fetchAllData(currentUser);
       }
     });
 
@@ -397,163 +402,167 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             top: `${rect.top}px`,
             width: `${rect.width}px`,
             height: `${rect.height}px`,
-            backgroundImage: `url(${(element as HTMLImageElement).src})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
             opacity: '1',
+            transform: 'scale(1)',
             transition: 'none',
         });
-        
-        requestAnimationFrame(() => {
+
+        // Use a timeout to allow the browser to apply the initial styles
+        setTimeout(() => {
             Object.assign(flyingItem.style, {
-                transition: 'all 0.6s cubic-bezier(0.5, -0.5, 0.5, 1.5)',
                 left: `${cartRect.left + cartRect.width / 2}px`,
                 top: `${cartRect.top + cartRect.height / 2}px`,
-                width: '1rem',
-                height: '1rem',
-                opacity: '0',
+                width: '0px',
+                height: '0px',
+                opacity: '0.5',
+                transform: 'scale(0.1)',
+                transition: 'all 0.5s ease-in-out',
             });
-        });
-  };
+        }, 10);
+    };
 
   // --- Order Actions ---
   const addOrder = async (orderData: Omit<Order, 'id' | 'user_id' | 'created_at' | 'status'>) => {
-    if (!state.current_user) return { error: new Error('User not logged in') };
-    
-    try {
-      const productIds = orderData.order_items.map(item => item.product.id);
-      const { data: fullProductsData, error: productsError } = await supabaseClient
-        .from('products')
-        .select('*')
-        .in('id', productIds);
+    const order_items = orderData.order_items.map(item => ({
+        id: item.product.id,
+        quantity: item.quantity,
+    }));
 
-      if (productsError) throw productsError;
+    const enrichedOrderItems = orderData.order_items.map(item => ({
+        id: item.product.id,
+        quantity: item.quantity,
+        product: {
+            id: item.product.id,
+            name: item.product.name,
+            price: item.product.price,
+            image_urls: item.product.image_urls,
+            description: item.product.description,
+            rating: item.product.rating,
+            delivery_type: item.product.delivery_type,
+            created_at: item.product.created_at,
+            // Exclude delivery_content from being stored in the order JSON
+        }
+    }));
 
-      const fullProductsMap = new Map(fullProductsData.map(p => [p.id, p]));
-      const fullOrderItems = orderData.order_items.map(item => ({...item, product: fullProductsMap.get(item.product.id) || item.product}));
 
-      const { error } = await supabaseClient.from('orders').insert([{
-        user_id: state.current_user.id,
-        status: 'Payment Pending',
+    const { error } = await supabaseClient.from('orders').insert({
         ...orderData,
-        order_items: fullOrderItems,
-      }]).select().single();
-
-      if (error) throw error;
-      
-      return { error: null };
-    } catch (e: any) {
-      console.error('Unexpected error in addOrder:', e);
-      return { error: e };
-    }
+        order_items: enrichedOrderItems,
+        user_id: state.current_user?.id || null,
+        status: 'Payment Pending',
+    });
+    return { error };
   };
-  
-  const refreshAdminData = async () => {
-    // A simplified refresh function for admin actions
-    await fetchAllData();
-  }
 
   // --- Admin Actions ---
   const setAdminPage = (page: string) => setState(prev => ({ ...prev, admin_page: page }));
+
+  // Category Actions
   const addCategory = async (categoryData: Omit<Category, 'id' | 'products'>) => {
-    const { error } = await supabaseClient.from('categories').insert([categoryData]);
-    if (!error) await refreshAdminData();
+    const { error } = await supabaseClient.from('categories').insert(categoryData);
+    if (!error) await fetchAllData(state.current_user);
     return { error };
   };
   const updateCategory = async (categoryData: Omit<Category, 'products'>) => {
     const { error } = await supabaseClient.from('categories').update(categoryData).eq('id', categoryData.id);
-    if (!error) await refreshAdminData();
+    if (!error) await fetchAllData(state.current_user);
     return { error };
   };
   const deleteCategory = async (categoryId: string) => {
     const { error } = await supabaseClient.from('categories').delete().eq('id', categoryId);
-    if (!error) await refreshAdminData();
+    if (!error) await fetchAllData(state.current_user);
     return { error };
   };
+
+  // Product Actions
   const addProduct = async (categoryId: string, productData: Omit<Product, 'id'>) => {
-    const payload = { ...productData, category_id: categoryId };
-    const { error } = await supabaseClient.from('products').insert([payload]);
-    if (!error) await refreshAdminData();
+    const { error } = await supabaseClient.from('products').insert({ ...productData, category_id: categoryId });
+    if (!error) await fetchAllData(state.current_user);
     return { error };
   };
   const updateProduct = async (productId: string, productData: Omit<Product, 'id'>, newCategoryId: string) => {
-      const payload = { ...productData, category_id: newCategoryId };
-      const { error } = await supabaseClient.from('products').update(payload).eq('id', productId);
-      if (!error) await refreshAdminData();
-      return { error };
+    const { error } = await supabaseClient.from('products').update({ ...productData, category_id: newCategoryId }).eq('id', productId);
+    if (!error) await fetchAllData(state.current_user);
+    return { error };
   };
   const deleteProduct = async (productId: string) => {
-      const { error } = await supabaseClient.from('products').delete().eq('id', productId);
-      if (!error) await refreshAdminData();
-      return { error };
+    const { error } = await supabaseClient.from('products').delete().eq('id', productId);
+    if (!error) await fetchAllData(state.current_user);
+    return { error };
   };
+  
+  // Order Admin Actions
   const updateOrderStatus = async (orderId: string, status: Order['status']) => {
     const { error } = await supabaseClient.from('orders').update({ status }).eq('id', orderId);
     return { error };
   };
-   const updateOrderDelivery = async (orderId: string, deliveryData: { [itemId: string]: string | string[] }) => {
-    const { error } = await supabaseClient.from('orders').update({ manual_delivery_data: deliveryData }).eq('id', orderId);
+  
+  const updateOrderDelivery = async (orderId: string, deliveryData: { [itemId: string]: string | string[] }) => {
+    const { error } = await supabaseClient.from('orders').update({ manual_delivery_data: deliveryData, status: 'Completed' }).eq('id', orderId);
     return { error };
   };
+
+  // User Admin Actions
   const updateUserRole = async (userId: string, role: UserRole, fullName: string) => {
-      const { error } = await supabaseClient.rpc('update_user_role_and_meta', {
-          user_id: userId,
-          new_role: role,
-          new_full_name: fullName
-      });
-      return { error };
-  };
-  const updateSiteSettings = async (settings: SiteSettings) => {
-    const { error } = await supabaseClient.from('site_settings').update(settings).eq('id', 1);
-    if (!error) setState(prev => ({ ...prev, site_settings: settings }));
+    const { error } = await supabaseClient.rpc('update_user_role_and_meta', {
+      user_id: userId,
+      new_role: role,
+      new_full_name: fullName,
+    });
     return { error };
   };
+  
+  // Settings Admin Actions
+  const updateSiteSettings = async (settings: SiteSettings) => {
+    const { error } = await supabaseClient.from('site_settings').upsert({ ...settings, id: 1 });
+    if (!error) {
+        setState(prev => ({...prev, site_settings: settings}));
+    }
+    return { error };
+  };
+
   const addHeroSlide = async (slideData: Omit<HeroSlide, 'id'>) => {
-      const { error } = await supabaseClient.from('hero_slides').insert([slideData]);
-      if (!error) await refreshAdminData();
-      return { error };
+    const { error } = await supabaseClient.from('hero_slides').insert(slideData);
+    if (!error) await fetchAllData(state.current_user);
+    return { error };
   };
   const updateHeroSlide = async (slideData: HeroSlide) => {
-      const { error } = await supabaseClient.from('hero_slides').update(slideData).eq('id', slideData.id);
-      if (!error) await refreshAdminData();
-      return { error };
+    const { error } = await supabaseClient.from('hero_slides').update(slideData).eq('id', slideData.id);
+    if (!error) await fetchAllData(state.current_user);
+    return { error };
   };
   const deleteHeroSlide = async (slideId: string) => {
-      const { error } = await supabaseClient.from('hero_slides').delete().eq('id', slideId);
-      if (!error) await refreshAdminData();
-      return { error };
+    const { error } = await supabaseClient.from('hero_slides').delete().eq('id', slideId);
+    if (!error) await fetchAllData(state.current_user);
+    return { error };
   };
+  
   const updatePage = async (pageKey: PageKey, content: any) => {
-      const { error } = await supabaseClient.from('pages').upsert({ id: pageKey, content }, { onConflict: 'id' });
-      if (!error) await refreshAdminData();
-      return { error };
+    const { error } = await supabaseClient.from('pages').upsert({ id: pageKey, content: content });
+    if (!error) {
+       setState(prev => ({
+           ...prev,
+           pages: {
+               ...prev.pages,
+               [pageKey]: { ...prev.pages[pageKey as keyof typeof prev.pages]!, content }
+           }
+       }));
+    }
+    return { error };
   };
+  
   const upsertHomepageSections = async (sections: HomepageSection[]) => {
-      const upsertData = sections.map((section, index) => ({
-        id: section.id,
-        type: section.type,
-        title: section.title,
-        subtitle: section.subtitle,
-        category_id: section.category_id,
-        visible: section.visible,
+      const sectionsToUpsert = sections.map((section, index) => ({
+        ...section,
         index,
       }));
-      const { error } = await supabaseClient.from('homepage_sections').upsert(upsertData, { onConflict: 'id' });
-      
-      const allSectionIds = sections.map(s => s.id);
-      if (allSectionIds.length > 0) {
-        const { error: deleteError } = await supabaseClient
-          .from('homepage_sections')
-          .delete()
-          .not('id', 'in', `(${allSectionIds.join(',')})`);
-         if (!error && !deleteError) await refreshAdminData();
-         return { error: error || deleteError };
-      } else {
-        const { error: deleteAllError } = await supabaseClient.from('homepage_sections').delete().neq('id', crypto.randomUUID());
-        if (!error && !deleteAllError) await refreshAdminData();
-        return { error: error || deleteAllError };
+      const { error } = await supabaseClient.from('homepage_sections').upsert(sectionsToUpsert);
+      if (!error) {
+          setState(prev => ({ ...prev, homepage_sections: sectionsToUpsert }));
       }
+      return { error };
   };
+
 
   const contextValue = useMemo(() => ({
     state,
@@ -590,10 +599,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     upsertHomepageSections,
     setSearchTerm,
     fetchAllData,
-  }), [state, findProductById, navigateTo, login, signup, logout, updateUser, changePassword, addToCart, updateCartQuantity, removeFromCart, clearCart, setCartOpen, setCheckoutOpen, triggerFlyToCartAnimation, addOrder, setAdminPage, addCategory, updateCategory, deleteCategory, addProduct, updateProduct, deleteProduct, updateOrderStatus, updateOrderDelivery, updateUserRole, updateSiteSettings, addHeroSlide, updateHeroSlide, deleteHeroSlide, updatePage, upsertHomepageSections, setSearchTerm, fetchAllData]);
+  }), [state, findProductById, fetchAllData]);
 
-  // @ts-ignore
-  return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={contextValue}>
+      {children}
+    </AppContext.Provider>
+  );
 };
 
 export const useAppContext = (): AppContextType => {

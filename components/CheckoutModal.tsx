@@ -132,45 +132,95 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
     const handlePlaceOrder = async () => {
         setProcessing(true);
         setError('');
-        
-        const selectedMethod = site_settings.payment_methods.find(m => m.id === selectedPaymentMethodId);
-        
-        if (!selectedMethod) {
-            setError("Please select a payment method.");
+    
+        try {
+            const selectedMethod = site_settings.payment_methods.find(m => m.id === selectedPaymentMethodId);
+    
+            if (!selectedMethod) {
+                setError("Please select a payment method.");
+                return;
+            }
+    
+            const orderItems: OrderItem[] = validCart.map(item => ({
+                id: item.product.id,
+                product: item.product,
+                quantity: item.quantity
+            }));
+    
+            // Handle WhatsApp payment specifically
+            if (selectedMethod.icon === 'whatsapp') {
+                const numberValue = selectedMethod.fields?.[0]?.value;
+                const adminWhatsappNumber = numberValue?.replace(/\D/g, '');
+    
+                if (!adminWhatsappNumber) {
+                    setError("لم يتم تكوين رقم واتساب للمسؤول. يرجى الاتصال بالدعم.");
+                    return;
+                }
+    
+                const productLines = validCart.map(item => ` - ${item.quantity} x ${t(item.product.name)}`).join('\n');
+    
+                const message = `
+مرحباً، أود إتمام هذا الطلب:
+
+*المنتجات:*
+${productLines}
+
+*المجموع:* ${subtotal.toFixed(2)} ${currency}
+
+*بياناتي:*
+الاسم: ${customerName}
+البريد الإلكتروني: ${customerEmail}
+${t('checkout.whatsapp')}: ${customerWhatsapp}
+                `.trim().replace(/^\s*\n/gm, '');
+    
+                const whatsappUrl = `https://wa.me/${adminWhatsappNumber}?text=${encodeURIComponent(message)}`;
+    
+                const { error: orderError } = await addOrder({
+                    order_items: orderItems,
+                    total: subtotal,
+                    customer_name: customerName,
+                    customer_email: customerEmail,
+                    customer_whatsapp: customerWhatsapp,
+                    payment_method: selectedMethod.name,
+                });
+    
+                if (orderError) {
+                    throw orderError;
+                }
+    
+                clearCart();
+                onClose();
+                window.open(whatsappUrl, '_blank');
+                return;
+            }
+    
+            const needsProof = selectedMethod.icon !== 'credit-card' && selectedMethod.enabled;
+            if (needsProof && !proofUrl) {
+                setError(t('checkout.upload_proof'));
+                return;
+            }
+    
+            const { error: orderError } = await addOrder({
+                order_items: orderItems,
+                total: subtotal,
+                customer_name: customerName,
+                customer_email: customerEmail,
+                customer_whatsapp: customerWhatsapp,
+                payment_method: selectedMethod.name,
+                payment_proof_url: proofUrl || undefined,
+            });
+    
+            if (orderError) {
+                throw orderError;
+            } else {
+                setOrderPlaced(true);
+                clearCart();
+            }
+        } catch (err: any) {
+            console.error("Order placement error:", err);
+            setError(err.message || "Failed to place order.");
+        } finally {
             setProcessing(false);
-            return;
-        }
-
-        const needsProof = selectedMethod.icon !== 'whatsapp' && selectedMethod.icon !== 'credit-card' && selectedMethod.enabled;
-        if(needsProof && !proofUrl) {
-             setError(t('checkout.upload_proof'));
-             setProcessing(false);
-             return;
-        }
-
-        const orderItems: OrderItem[] = validCart.map(item => ({
-            id: item.product.id,
-            product: item.product,
-            quantity: item.quantity
-        }));
-        
-        const { error: orderError } = await addOrder({
-            order_items: orderItems,
-            total: subtotal,
-            customer_name: customerName,
-            customer_email: customerEmail,
-            customer_whatsapp: customerWhatsapp,
-            payment_method: selectedMethod.name,
-            payment_proof_url: proofUrl || undefined,
-        });
-
-        if (orderError) {
-            console.error("Order placement error:", orderError);
-            setError(orderError.message || "Failed to place order.");
-            setProcessing(false);
-        } else {
-            setOrderPlaced(true);
-            clearCart();
         }
     };
     
@@ -202,15 +252,43 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
                             <button onClick={onClose} className="mt-8 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 px-8 rounded-full">{t('checkout.continue_shopping')}</button>
                         </div>
                     ) : (
-                       <div className="grid grid-cols-1 lg:grid-cols-2">
-                            {/* Left Side: Form */}
-                            <div className="p-8 space-y-6">
-                                <div className="space-y-4">
-                                    <input type="text" placeholder={current_user ? current_user.full_name : "الاسم الكامل"} value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full bg-slate-700 p-3 rounded-lg border border-slate-600 focus:ring-amber-500 focus:border-amber-500" required/>
-                                    <input type="email" placeholder={t('checkout.email')} value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} className="w-full bg-slate-700 p-3 rounded-lg border border-slate-600 focus:ring-amber-500 focus:border-amber-500" required/>
-                                    <input type="tel" placeholder={t('checkout.whatsapp')} value={customerWhatsapp} onChange={e => setCustomerWhatsapp(e.target.value)} className="w-full bg-slate-700 p-3 rounded-lg border border-slate-600 focus:ring-amber-500 focus:border-amber-500" />
+                       <div className="p-8">
+                            {/* Order Summary */}
+                            <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-6 mb-8">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-lg font-semibold text-white">{t('checkout.order_summary')}</h3>
+                                    <div className="text-right">
+                                        <span className="text-lg font-bold text-white block">{t('checkout.total')}</span>
+                                        <span className="text-2xl font-bold text-amber-400">{subtotal.toFixed(2)} {currency}</span>
+                                    </div>
                                 </div>
-                                <div className="border-t border-slate-700 pt-6">
+                                <div className="space-y-4 max-h-40 overflow-y-auto pr-2 mt-4 border-t border-slate-700 pt-4">
+                                    {validCart.map(item => (
+                                        <div key={item.product.id} className="flex gap-4 items-center">
+                                            <div className="relative">
+                                                <img src={item.product.image_urls[0]} alt={t(item.product.name)} className="w-16 h-20 object-cover rounded-md" />
+                                                <span className="absolute -top-2 -right-2 bg-amber-500 text-slate-900 text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{item.quantity}</span>
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-sm font-semibold text-white">{t(item.product.name)}</p>
+                                            </div>
+                                            <p className="text-sm font-semibold text-white">{item.product.price}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Form & Payment Grid */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                {/* Left: User Info */}
+                                <div className="space-y-4">
+                                    <input type="text" placeholder={current_user?.full_name || "User"} value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full bg-slate-700 p-3 rounded-lg border border-slate-600 focus:ring-amber-500 focus:border-amber-500" required/>
+                                    <input type="email" placeholder={t('checkout.email')} value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} className="w-full bg-slate-700 p-3 rounded-lg border border-slate-600 focus:ring-amber-500 focus:border-amber-500" required/>
+                                    <input type="text" placeholder={t('checkout.whatsapp')} value={customerWhatsapp} onChange={e => setCustomerWhatsapp(e.target.value)} className="w-full bg-slate-700 p-3 rounded-lg border border-slate-600 focus:ring-amber-500 focus:border-amber-500" />
+                                </div>
+
+                                {/* Right: Payment Method */}
+                                <div>
                                     <h3 className="text-lg font-semibold text-white mb-4">{t('checkout.payment_method')}</h3>
                                     <div className="space-y-3">
                                         {site_settings.payment_methods.filter(m => m.enabled).map(method => (
@@ -218,6 +296,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
                                         ))}
                                     </div>
                                 </div>
+                            </div>
+                            
+                            {/* Full Width section for instructions and actions */}
+                             <div className="mt-6 space-y-4">
                                 {selectedMethodDetails && selectedMethodDetails.instructions && (
                                     <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
                                         <p className="text-sm text-gray-300 mb-3">{selectedMethodDetails.instructions}</p>
@@ -242,30 +324,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
                                         <input id="proof-upload" type="file" className="hidden" onChange={handleProofUpload} accept="image/*" />
                                     </div>
                                 )}
-
-                            </div>
-
-                            {/* Right Side: Order Summary */}
-                            <div className="p-8 bg-slate-900/50 border-r border-slate-700">
-                                <h3 className="text-lg font-semibold text-white mb-4">{t('checkout.order_summary')}</h3>
-                                <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
-                                    {validCart.map(item => (
-                                        <div key={item.product.id} className="flex gap-4">
-                                            <img src={item.product.image_urls[0]} alt={t(item.product.name)} className="w-16 h-16 object-cover rounded-md" />
-                                            <div className="flex-1">
-                                                <p className="text-sm font-semibold text-white">{t(item.product.name)}</p>
-                                                <p className="text-xs text-gray-400">Qty: {item.quantity}</p>
-                                            </div>
-                                            <p className="text-sm font-semibold text-white">{item.product.price}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="border-t border-slate-700 mt-4 pt-4 flex justify-between items-center">
-                                    <span className="text-lg font-bold text-white">{t('checkout.total')}:</span>
-                                    <span className="text-2xl font-bold text-amber-400">{subtotal.toFixed(2)} {currency}</span>
-                                </div>
                                 {error && <p className="text-red-400 text-sm mt-4 text-center">{error}</p>}
-                                <button onClick={handlePlaceOrder} disabled={processing || validCart.length === 0} className="mt-6 w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 px-4 rounded-full text-lg transition-transform duration-300 hover:scale-105 disabled:bg-slate-600 disabled:cursor-not-allowed">
+                                <button onClick={handlePlaceOrder} disabled={processing || validCart.length === 0} className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 px-4 rounded-full text-lg transition-transform duration-300 hover:scale-105 disabled:bg-slate-600 disabled:cursor-not-allowed">
                                     {processing ? t('checkout.processing') : t('checkout.pay_now')}
                                 </button>
                             </div>

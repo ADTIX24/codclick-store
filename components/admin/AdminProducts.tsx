@@ -50,11 +50,6 @@ const AdminProducts: React.FC = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [modalError, setModalError] = useState('');
 
-    useEffect(() => {
-        fetchAllData();
-    }, [fetchAllData]);
-
-
     const openModal = async (mode: ModalMode, data?: any) => {
         let fullData = { ...data }; // Create a mutable copy
     
