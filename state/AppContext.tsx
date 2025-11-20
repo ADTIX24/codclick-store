@@ -150,11 +150,109 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.warn('Could not access localStorage to get cart:', e);
     }
+    
+    // Initialize state from URL parameters or Hash
+    let page: PageKey = 'home';
+    let id = null;
+    let authMode: 'login' | 'signup' = 'login';
+
+    try {
+      // Check hash first (fallback mechanism takes priority if present)
+      if (window.location.hash && window.location.hash.length > 1) {
+          const params = new URLSearchParams(window.location.hash.substring(1));
+          page = (params.get('page') as PageKey) || 'home';
+          id = params.get('id');
+          authMode = (params.get('auth_mode') as 'login' | 'signup') || 'login';
+      } else {
+          // Check search params
+          const params = new URLSearchParams(window.location.search);
+          page = (params.get('page') as PageKey) || 'home';
+          id = params.get('id');
+          authMode = (params.get('auth_mode') as 'login' | 'signup') || 'login';
+      }
+    } catch (e) {
+      console.warn("Error parsing URL parameters:", e);
+    }
+
     return {
       ...initialAppState,
+      current_page: page,
+      current_category_id: page === 'category' ? id : null,
+      selected_product_id: page === 'product_detail' ? id : null,
+      auth_mode: authMode,
       cart: savedCart ? JSON.parse(savedCart) : [],
     };
   });
+
+  // Setup history and hash change listener
+  useEffect(() => {
+      const handleStateChange = (event?: PopStateEvent) => {
+          try {
+              let page: PageKey = 'home';
+              let id: string | null = null;
+              let authMode: 'login' | 'signup' = 'login';
+
+              // 1. Try History State (PopStateEvent)
+              if (event && event.state) {
+                  page = event.state.page;
+                  id = event.state.id;
+                  authMode = event.state.authMode || 'login';
+              }
+              // 2. Try Hash (fallback)
+              else if (window.location.hash && window.location.hash.length > 1) {
+                  const params = new URLSearchParams(window.location.hash.substring(1));
+                  page = (params.get('page') as PageKey) || 'home';
+                  id = params.get('id');
+                  authMode = (params.get('auth_mode') as 'login' | 'signup') || 'login';
+              }
+              // 3. Try Search Params (default)
+              else {
+                  const params = new URLSearchParams(window.location.search);
+                  page = (params.get('page') as PageKey) || 'home';
+                  id = params.get('id');
+                  authMode = (params.get('auth_mode') as 'login' | 'signup') || 'login';
+              }
+
+              setState(prev => ({
+                  ...prev,
+                  current_page: page,
+                  current_category_id: page === 'category' ? id : null,
+                  selected_product_id: page === 'product_detail' ? id : null,
+                  auth_mode: page === 'auth' ? authMode : prev.auth_mode,
+              }));
+          } catch (error) {
+              console.error("Error handling state change:", error);
+          }
+      };
+
+      window.addEventListener('popstate', handleStateChange);
+      window.addEventListener('hashchange', () => handleStateChange());
+
+      // Replace the initial history state safely
+      try {
+          if (!window.history.state) {
+              const params = new URLSearchParams(window.location.search);
+              const page = (params.get('page') as PageKey) || 'home';
+              const id = params.get('id');
+              const authMode = (params.get('auth_mode') as 'login' | 'signup') || 'login';
+              window.history.replaceState({ page, id, authMode }, '', window.location.href);
+          }
+      } catch (e) {
+          // console.warn("History replacement failed (SecurityError likely):", e);
+          // Use Hash as initial fallback if history API is completely blocked
+           try {
+                if(!window.location.hash && window.location.search) {
+                     // Convert search to hash if possible to maintain state without reloading
+                     // This is a soft fallback
+                }
+           } catch(e2) {}
+      }
+
+      return () => {
+          window.removeEventListener('popstate', handleStateChange);
+          window.removeEventListener('hashchange', () => handleStateChange());
+      };
+  }, []);
 
   const setLoading = (loading: boolean) => setState(prev => ({ ...prev, loading }));
   
@@ -223,8 +321,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             loading: false,
         }));
 
-    } catch (error) {
-        console.error("Error fetching all data:", error);
+    } catch (error: any) {
+        // Enhanced error logging to avoid [object Object]
+        console.error("Error fetching all data:", error.message || JSON.stringify(error));
         setLoading(false);
     }
 }, []);
@@ -301,18 +400,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setState(prev => ({ ...prev, search_term: term }));
   };
 
-  const navigateTo = (page: PageKey, id: string | null = null, authMode: 'login' | 'signup' = 'login') => {
-    const isSearchPage = page === 'products' || page === 'category';
-    setState(prev => ({
-      ...prev,
-      current_page: page,
-      current_category_id: page === 'category' ? id : null,
-      selected_product_id: page === 'product_detail' ? id : null,
-      auth_mode: page === 'auth' ? authMode : prev.auth_mode,
-      search_term: isSearchPage ? prev.search_term : '',
-    }));
-    window.scrollTo(0, 0);
-  };
+  const navigateTo = useCallback((page: PageKey, id: string | null = null, authMode: 'login' | 'signup' = 'login') => {
+    try {
+        // 1. Update React State Immediately (optimistic update)
+        const isSearchPage = page === 'products' || page === 'category';
+        setState(prev => ({
+          ...prev,
+          current_page: page,
+          current_category_id: page === 'category' ? id : null,
+          selected_product_id: page === 'product_detail' ? id : null,
+          auth_mode: page === 'auth' ? authMode : prev.auth_mode,
+          search_term: isSearchPage ? prev.search_term : '',
+        }));
+        window.scrollTo(0, 0);
+
+        // 2. Try to Push to History API
+        try {
+            const url = new URL(window.location.href);
+            url.searchParams.set('page', page);
+            if (id) {
+                url.searchParams.set('id', id);
+            } else {
+                url.searchParams.delete('id');
+            }
+            if (page === 'auth') {
+                url.searchParams.set('auth_mode', authMode);
+            } else {
+                url.searchParams.delete('auth_mode');
+            }
+            
+            window.history.pushState({ page, id, authMode }, '', url.toString());
+        } catch (securityError) {
+             // 3. Fallback: Use Hash if History API is blocked (SecurityError)
+             // This ensures navigation still works in sandboxes
+             try {
+                const params = new URLSearchParams();
+                params.set('page', page);
+                if(id) params.set('id', id);
+                if(page === 'auth') params.set('auth_mode', authMode);
+                window.location.hash = params.toString();
+             } catch(hashError) {
+                 console.error("Navigation failed:", hashError);
+             }
+        }
+
+    } catch (error) {
+        console.error("Navigation error:", error);
+    }
+  }, []);
 
   // --- Auth Actions ---
   const login = (email: string, password: string) => supabaseClient.auth.signInWithPassword({ email, password });
@@ -423,11 +558,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- Order Actions ---
   const addOrder = async (orderData: Omit<Order, 'id' | 'user_id' | 'created_at' | 'status'>) => {
-    const order_items = orderData.order_items.map(item => ({
-        id: item.product.id,
-        quantity: item.quantity,
-    }));
-
     const enrichedOrderItems = orderData.order_items.map(item => ({
         id: item.product.id,
         quantity: item.quantity,
@@ -599,7 +729,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     upsertHomepageSections,
     setSearchTerm,
     fetchAllData,
-  }), [state, findProductById, fetchAllData]);
+  }), [state, findProductById, fetchAllData, navigateTo]);
 
   return (
     <AppContext.Provider value={contextValue}>
