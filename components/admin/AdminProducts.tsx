@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
-// FIX: Added .tsx extension to module import.
 import { useAppContext } from '../../state/AppContext.tsx';
-// FIX: Added .tsx extension to module import.
 import { useLanguage } from '../../i18n/LanguageContext.tsx';
-// FIX: Added .ts extension to module import.
 import type { Category, Product } from '../../types.ts';
 import { supabaseClient } from '../../supabase/client.ts';
 
@@ -23,7 +20,7 @@ type ModalMode = 'addCategory' | 'editCategory' | 'addProduct' | 'editProduct';
 interface ModalState {
     isOpen: boolean;
     mode: ModalMode | null;
-    data?: Category | Product;
+    data?: Category | Product | { categoryId?: string };
 }
 
 interface ConfirmState {
@@ -33,7 +30,7 @@ interface ConfirmState {
 }
 
 const AdminProducts: React.FC = () => {
-    const { state, addCategory, updateCategory, deleteCategory, addProduct, updateProduct, deleteProduct, fetchAllData } = useAppContext();
+    const { state, addCategory, updateCategory, deleteCategory, addProduct, updateProduct, deleteProduct } = useAppContext();
     const { t } = useLanguage();
 
     const [modalState, setModalState] = useState<ModalState>({ isOpen: false, mode: null, data: undefined });
@@ -72,10 +69,14 @@ const AdminProducts: React.FC = () => {
         }
 
         // Reset and set display images
-        if ((mode === 'editProduct' || mode === 'addProduct') && fullData?.image_urls) {
-            setImageUrls(fullData.image_urls);
-        } else if (mode === 'editCategory' && fullData?.image_url) {
-            setImageUrls([fullData.image_url]);
+        if ((mode === 'editProduct' || mode === 'addProduct')) {
+            // @ts-ignore
+            if (fullData?.image_urls) setImageUrls(fullData.image_urls);
+            else setImageUrls([]);
+        } else if (mode === 'editCategory') {
+            // @ts-ignore
+            if (fullData?.image_url) setImageUrls([fullData.image_url]);
+            else setImageUrls([]);
         } else {
             setImageUrls([]);
         }
@@ -123,47 +124,60 @@ const AdminProducts: React.FC = () => {
 
         let result: { error: any | null } | undefined;
 
-        switch (modalState.mode) {
-            case 'addCategory':
-                result = await addCategory({ name: values.name as string, image_url: imageUrls[0] || '' });
-                break;
-            case 'editCategory':
-                result = await updateCategory({ id: (modalState.data as Category).id, name: values.name as string, image_url: imageUrls[0] || (modalState.data as Category).image_url });
-                break;
-            case 'addProduct':
-            case 'editProduct': {
-                let finalDeliveryContent: string | string[] = '';
-                if(deliveryType !== 'code') {
-                    finalDeliveryContent = deliveryFile;
-                } else {
-                    finalDeliveryContent = deliveryCodes.split('\n').filter(code => code.trim() !== '');
+        try {
+            switch (modalState.mode) {
+                case 'addCategory':
+                    result = await addCategory({ name: values.name as string, image_url: imageUrls[0] || '' });
+                    break;
+                case 'editCategory':
+                    result = await updateCategory({ id: (modalState.data as Category).id, name: values.name as string, image_url: imageUrls[0] || (modalState.data as Category).image_url });
+                    break;
+                case 'addProduct':
+                case 'editProduct': {
+                    let finalDeliveryContent: string | string[] = '';
+                    if(deliveryType !== 'code') {
+                        finalDeliveryContent = deliveryFile;
+                    } else {
+                        finalDeliveryContent = deliveryCodes.split('\n').filter(code => code.trim() !== '');
+                    }
+
+                    const rawPrice = (values.price as string).trim();
+                    const numberPart = parseFloat(rawPrice.replace(/[^0-9.]/g, ''));
+                    const formattedPrice = !isNaN(numberPart) ? `${numberPart.toFixed(2)}$` : rawPrice;
+                    
+                    const ratingVal = parseFloat(values.rating as string);
+
+                    const productData: Omit<Product, 'id'> = {
+                        name: values.name as string,
+                        price: formattedPrice,
+                        image_urls: imageUrls,
+                        description: values.description as string,
+                        rating: isNaN(ratingVal) ? 5.0 : ratingVal,
+                        delivery_type: deliveryType,
+                        delivery_content: finalDeliveryContent,
+                        created_at: (modalState.data as Product)?.created_at || new Date().toISOString(),
+                    };
+
+                    const categoryId = (values.categoryId as string);
+                    
+                    if (!categoryId) {
+                         setModalError("خطأ: يرجى اختيار فئة للمنتج.");
+                         return;
+                    }
+
+                    if (modalState.mode === 'addProduct') {
+                         result = await addProduct(categoryId, productData);
+                    } else {
+                        const originalProduct = modalState.data as Product;
+                        result = await updateProduct(originalProduct.id, productData, categoryId);
+                    }
+                    break;
                 }
-
-                const rawPrice = (values.price as string).trim();
-                const numberPart = parseFloat(rawPrice.replace(/[^0-9.]/g, ''));
-                const formattedPrice = !isNaN(numberPart) ? `${numberPart.toFixed(2)}$` : rawPrice;
-
-
-                const productData: Omit<Product, 'id'> = {
-                    name: values.name as string,
-                    price: formattedPrice,
-                    image_urls: imageUrls,
-                    description: values.description as string,
-                    rating: parseFloat(values.rating as string),
-                    delivery_type: deliveryType,
-                    delivery_content: finalDeliveryContent,
-                    created_at: (modalState.data as Product)?.created_at || new Date().toISOString(),
-                };
-
-                if (modalState.mode === 'addProduct') {
-                     result = await addProduct(values.categoryId as string, productData);
-                } else {
-                    const originalProduct = modalState.data as Product;
-                    const newCategoryId = values.categoryId as string;
-                    result = await updateProduct(originalProduct.id, productData, newCategoryId);
-                }
-                break;
             }
+        } catch (err: any) {
+            console.error("Unexpected error in form submit:", err);
+            setModalError(`An unexpected error occurred: ${err.message || err}`);
+            return;
         }
 
         if (result && result.error) {
@@ -351,6 +365,16 @@ const AdminProducts: React.FC = () => {
         }
 
         const defaultData = isEditMode ? modalState.data : {};
+        
+        // Correctly determine default category ID
+        let defaultCategoryId = '';
+        if (modalState.mode === 'editProduct' && (defaultData as Product)?.id) {
+             const foundCat = state.categories.find(c => c.products.some(p => p.id === (defaultData as Product).id));
+             if (foundCat) defaultCategoryId = foundCat.id;
+        } else if (modalState.mode === 'addProduct') {
+             // Use the passed categoryId or fallback to the first category
+             defaultCategoryId = (modalState.data as any)?.categoryId || state.categories[0]?.id || '';
+        }
 
         const fileUploadConfig = {
             image: { accept: 'image/*', text: 'PNG, JPG, GIF', icon: <UploadIcon /> },
@@ -394,19 +418,21 @@ const AdminProducts: React.FC = () => {
                                 </div>
                                 <div>
                                     <label className="block mb-1 font-semibold">الفئة</label>
-                                    <select name="categoryId"
-                                        defaultValue={
-                                            isEditMode
-                                            ? (state.categories.find(c => c.products.some(p => p.id === (defaultData as Product)?.id)) )?.id
-                                            : (modalState.data as Category)?.id || (state.categories[0]?.id || '')
-                                        }
-                                        className="w-full bg-slate-700 p-2 rounded border border-slate-600"
-                                        required
-                                    >
-                                        {state.categories.map(cat => (
-                                            <option key={cat.id} value={cat.id}>{t(cat.name)}</option>
-                                        ))}
-                                    </select>
+                                    {state.categories.length === 0 ? (
+                                        <div className="p-3 bg-red-500/20 text-red-300 rounded text-sm border border-red-500/30">
+                                            تحذير: لا توجد فئات. يرجى إضافة فئة أولاً.
+                                        </div>
+                                    ) : (
+                                        <select name="categoryId"
+                                            defaultValue={defaultCategoryId}
+                                            className="w-full bg-slate-700 p-2 rounded border border-slate-600"
+                                            required
+                                        >
+                                            {state.categories.map(cat => (
+                                                <option key={cat.id} value={cat.id}>{t(cat.name)}</option>
+                                            ))}
+                                        </select>
+                                    )}
                                 </div>
                              </>
                         )}
