@@ -1,7 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-// FIX: Added .tsx extension to module import.
 import { useLanguage } from '../i18n/LanguageContext.tsx';
-// FIX: Added .tsx extension to module import.
 import { useAppContext } from '../state/AppContext.tsx';
 
 const EyeIcon: React.FC = () => (
@@ -20,7 +19,7 @@ const EyeOffIcon: React.FC = () => (
 
 
 const AuthPage: React.FC = () => {
-    const { t, dir } = useLanguage();
+    const { t } = useLanguage();
     const { navigateTo, login, signup, state } = useAppContext();
     const { auth_mode, current_user } = state;
 
@@ -49,18 +48,6 @@ const AuthPage: React.FC = () => {
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [loading, setLoading] = useState(false);
-
-    const toggleAuthMode = (e: React.MouseEvent) => {
-        e.preventDefault();
-        setIsLogin(!isLogin);
-        setError('');
-        setSuccessMessage('');
-        setFullName('');
-        setEmail('');
-        setWhatsapp('');
-        setPassword('');
-        setConfirmPassword('');
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -119,7 +106,7 @@ const AuthPage: React.FC = () => {
                     </h2>
                 </div>
                 <form className="mt-8 space-y-6" onSubmit={handleSubmit} noValidate>
-                    <div className="rounded-md shadow-sm">
+                    <div className="rounded-md shadow-sm space-y-4">
                         {!isLogin && (
                              <div className="mb-4">
                                 <label htmlFor="full-name" className="sr-only">{t('auth.fullNameLabel')}</label>
@@ -171,67 +158,78 @@ const AuthPage: React.FC = () => {
                                 id="password" 
                                 name="password" 
                                 type={passwordVisible ? 'text' : 'password'}
-                                autoComplete={isLogin ? "current-password" : "new-password"}
+                                autoComplete="current-password"
                                 required 
-                                className={`appearance-none rounded-md relative block w-full py-3 ${dir === 'rtl' ? 'pr-3 pl-10' : 'pl-3 pr-10'} border border-slate-600 bg-slate-700/50 text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 focus:z-10 sm:text-sm text-left`} 
+                                className="appearance-none rounded-md relative block w-full px-3 py-3 border border-slate-600 bg-slate-700/50 text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 focus:z-10 sm:text-sm text-left pr-10" 
                                 placeholder={t('auth.passwordPlaceholder')}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 dir="ltr"
-                            />
-                            <button
+                             />
+                             <button
                                 type="button"
-                                className={`absolute inset-y-0 ${dir === 'rtl' ? 'left-0 pl-3' : 'right-0 pr-3'} flex items-center text-gray-400 hover:text-amber-400`}
                                 onClick={() => setPasswordVisible(!passwordVisible)}
-                            >
+                                className="absolute inset-y-0 right-0 pr-3 flex items-center z-20 text-gray-400 hover:text-gray-300"
+                             >
                                 {passwordVisible ? <EyeOffIcon /> : <EyeIcon />}
-                            </button>
+                             </button>
                         </div>
-                         {!isLogin && (
-                             <div className="mb-4 relative">
+                        {!isLogin && (
+                            <div className="mb-4 relative">
                                 <label htmlFor="confirm-password" className="sr-only">{t('auth.confirmPasswordLabel')}</label>
                                 <input 
                                     id="confirm-password" 
                                     name="confirm-password" 
-                                    type={confirmPasswordVisible ? 'text' : 'password'} 
+                                    type={confirmPasswordVisible ? 'text' : 'password'}
                                     autoComplete="new-password"
                                     required 
-                                    className={`appearance-none rounded-md relative block w-full py-3 ${dir === 'rtl' ? 'pr-3 pl-10' : 'pl-3 pr-10'} border border-slate-600 bg-slate-700/50 text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 focus:z-10 sm:text-sm text-left`} 
-                                    placeholder={t('auth.confirmPasswordLabel')} 
-                                    dir="ltr"
+                                    className="appearance-none rounded-md relative block w-full px-3 py-3 border border-slate-600 bg-slate-700/50 text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 focus:z-10 sm:text-sm text-left pr-10" 
+                                    placeholder={t('auth.confirmPasswordLabel')}
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
+                                    dir="ltr"
                                 />
-                                <button
+                                 <button
                                     type="button"
-                                    className={`absolute inset-y-0 ${dir === 'rtl' ? 'left-0 pl-3' : 'right-0 pr-3'} flex items-center text-gray-400 hover:text-amber-400`}
                                     onClick={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center z-20 text-gray-400 hover:text-gray-300"
                                 >
                                     {confirmPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
                                 </button>
                             </div>
                         )}
                     </div>
-                    
-                    {error && <p className="text-sm text-center text-red-400">{error}</p>}
+
+                    {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
                     <div>
-                        <button type="submit" disabled={loading} className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-slate-900 bg-amber-500 hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-amber-500 disabled:bg-slate-600 disabled:cursor-not-allowed">
-                           {loading ? '...' : (isLogin ? t('auth.loginButton') : t('auth.signupButton'))}
+                        <button 
+                            type="submit" 
+                            disabled={loading}
+                            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-slate-900 bg-amber-500 hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-70 disabled:cursor-not-allowed"
+                        >
+                            {loading ? (
+                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-slate-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            ) : null}
+                            {isLogin ? t('auth.loginButton') : t('auth.signupButton')}
                         </button>
                     </div>
                 </form>
-                <div className="text-sm text-center">
-                    <span className="text-gray-400">
-                         {isLogin ? t('auth.switchToSignupPrompt') : t('auth.switchToLoginPrompt')}{' '}
-                    </span>
-                    <a href="#" onClick={toggleAuthMode} className="font-medium text-amber-400 hover:text-amber-500">
-                        {isLogin ? t('auth.switchToSignupLink') : t('auth.switchToLoginLink')}
-                    </a>
+                
+                <div className="text-center mt-4">
+                    <p className="text-sm text-gray-400">
+                        {isLogin ? t('auth.switchToSignupPrompt') : t('auth.switchToLoginPrompt')}{' '}
+                        <button onClick={(e) => { e.preventDefault(); setIsLogin(!isLogin); setError(''); setSuccessMessage(''); }} className="font-medium text-amber-500 hover:text-amber-400">
+                            {isLogin ? t('auth.switchToSignupLink') : t('auth.switchToLoginLink')}
+                        </button>
+                    </p>
                 </div>
             </div>
         </div>
     );
-}
+};
 
 export default AuthPage;

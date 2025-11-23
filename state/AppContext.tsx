@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { supabaseClient } from '../supabase/client.ts';
 import type { AppState, PageKey, CartItem, Product, User, SignUpData, Order, OrderItem, Category, HeroSlide, SiteSettings, PageContent, UserRole, HomepageSection, PaymentMethod } from '../types.ts';
@@ -157,21 +158,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let authMode: 'login' | 'signup' = 'login';
 
     try {
-      // Check hash first (fallback mechanism takes priority if present)
-      if (window.location.hash && window.location.hash.length > 1) {
-          const params = new URLSearchParams(window.location.hash.substring(1));
-          page = (params.get('page') as PageKey) || 'home';
-          id = params.get('id');
-          authMode = (params.get('auth_mode') as 'login' | 'signup') || 'login';
-      } else {
-          // Check search params
-          const params = new URLSearchParams(window.location.search);
-          page = (params.get('page') as PageKey) || 'home';
-          id = params.get('id');
-          authMode = (params.get('auth_mode') as 'login' | 'signup') || 'login';
-      }
+        // Safe location access with robust error handling for blob/sandbox environments
+        const loc = window.location;
+        
+        // Check hash first (fallback mechanism takes priority if present)
+        if (loc.hash && loc.hash.length > 1) {
+            const params = new URLSearchParams(loc.hash.substring(1));
+            page = (params.get('page') as PageKey) || 'home';
+            id = params.get('id');
+            authMode = (params.get('auth_mode') as 'login' | 'signup') || 'login';
+        } else {
+            // Check search params
+            const params = new URLSearchParams(loc.search);
+            page = (params.get('page') as PageKey) || 'home';
+            id = params.get('id');
+            authMode = (params.get('auth_mode') as 'login' | 'signup') || 'login';
+        }
     } catch (e) {
-      console.warn("Error parsing URL parameters:", e);
+        // If location access fails entirely (security error), default to home
+        console.warn("Location access restricted, defaulting to home.");
     }
 
     return {
@@ -186,31 +191,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Setup history and hash change listener
   useEffect(() => {
-      const handleStateChange = (event?: PopStateEvent) => {
+      const handleStateChange = (event?: Event) => {
           try {
               let page: PageKey = 'home';
               let id: string | null = null;
               let authMode: 'login' | 'signup' = 'login';
 
               // 1. Try History State (PopStateEvent)
-              if (event && event.state) {
-                  page = event.state.page;
-                  id = event.state.id;
-                  authMode = event.state.authMode || 'login';
+              const popEvent = event as PopStateEvent;
+              if (popEvent && popEvent.state) {
+                  page = popEvent.state.page || 'home';
+                  id = popEvent.state.id || null;
+                  authMode = popEvent.state.authMode || 'login';
               }
-              // 2. Try Hash (fallback)
-              else if (window.location.hash && window.location.hash.length > 1) {
-                  const params = new URLSearchParams(window.location.hash.substring(1));
-                  page = (params.get('page') as PageKey) || 'home';
-                  id = params.get('id');
-                  authMode = (params.get('auth_mode') as 'login' | 'signup') || 'login';
-              }
-              // 3. Try Search Params (default)
               else {
-                  const params = new URLSearchParams(window.location.search);
-                  page = (params.get('page') as PageKey) || 'home';
-                  id = params.get('id');
-                  authMode = (params.get('auth_mode') as 'login' | 'signup') || 'login';
+                   // Safe reading of location
+                   try {
+                       // 2. Try Hash (fallback)
+                       if (window.location.hash && window.location.hash.length > 1) {
+                           const params = new URLSearchParams(window.location.hash.substring(1));
+                           page = (params.get('page') as PageKey) || 'home';
+                           id = params.get('id');
+                           authMode = (params.get('auth_mode') as 'login' | 'signup') || 'login';
+                       }
+                       // 3. Try Search Params (default)
+                       else if (window.location.search) {
+                           const params = new URLSearchParams(window.location.search);
+                           page = (params.get('page') as PageKey) || 'home';
+                           id = params.get('id');
+                           authMode = (params.get('auth_mode') as 'login' | 'signup') || 'login';
+                       }
+                   } catch(locError) {
+                       // Ignore location errors during state change
+                       // This is expected in some sandboxed environments
+                   }
               }
 
               setState(prev => ({
@@ -225,32 +239,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
       };
 
+      // Need a stable reference for hash change listener removal
+      const onHashChange = () => handleStateChange();
+
       window.addEventListener('popstate', handleStateChange);
-      window.addEventListener('hashchange', () => handleStateChange());
+      window.addEventListener('hashchange', onHashChange);
 
       // Replace the initial history state safely
       try {
           if (!window.history.state) {
-              const params = new URLSearchParams(window.location.search);
-              const page = (params.get('page') as PageKey) || 'home';
-              const id = params.get('id');
-              const authMode = (params.get('auth_mode') as 'login' | 'signup') || 'login';
-              window.history.replaceState({ page, id, authMode }, '', window.location.href);
+              try {
+                  const params = new URLSearchParams(window.location.search);
+                  const page = (params.get('page') as PageKey) || 'home';
+                  const id = params.get('id');
+                  const authMode = (params.get('auth_mode') as 'login' | 'signup') || 'login';
+                  window.history.replaceState({ page, id, authMode }, '', window.location.href);
+              } catch(e) {
+                 // ignore URL parsing errors on init
+              }
           }
       } catch (e) {
-          // console.warn("History replacement failed (SecurityError likely):", e);
-          // Use Hash as initial fallback if history API is completely blocked
-           try {
-                if(!window.location.hash && window.location.search) {
-                     // Convert search to hash if possible to maintain state without reloading
-                     // This is a soft fallback
-                }
-           } catch(e2) {}
+          // History API might be blocked, ignore
       }
 
       return () => {
           window.removeEventListener('popstate', handleStateChange);
-          window.removeEventListener('hashchange', () => handleStateChange());
+          window.removeEventListener('hashchange', onHashChange);
       };
   }, []);
 
@@ -324,6 +338,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (error: any) {
         // Enhanced error logging to avoid [object Object]
         console.error("Error fetching all data:", error.message || JSON.stringify(error));
+        // Always ensure loading stops even if fetch fails, to allow navigation
         setLoading(false);
     }
 }, []);
@@ -416,23 +431,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // 2. Try to Push to History API
         try {
-            const url = new URL(window.location.href);
-            url.searchParams.set('page', page);
-            if (id) {
-                url.searchParams.set('id', id);
-            } else {
-                url.searchParams.delete('id');
-            }
-            if (page === 'auth') {
-                url.searchParams.set('auth_mode', authMode);
-            } else {
-                url.searchParams.delete('auth_mode');
+            // Build a URL safely
+            let urlStr = '';
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('page', page);
+                if (id) url.searchParams.set('id', id); else url.searchParams.delete('id');
+                if (page === 'auth') url.searchParams.set('auth_mode', authMode); else url.searchParams.delete('auth_mode');
+                urlStr = url.toString();
+            } catch(e) {
+                // Fallback string construction if URL object fails
+                urlStr = `?page=${page}`;
+                if(id) urlStr += `&id=${id}`;
             }
             
-            window.history.pushState({ page, id, authMode }, '', url.toString());
+            window.history.pushState({ page, id, authMode }, '', urlStr);
         } catch (securityError) {
              // 3. Fallback: Use Hash if History API is blocked (SecurityError)
-             // This ensures navigation still works in sandboxes
+             // This ensures navigation still works in sandboxes by swallowing the error if assignment fails
              try {
                 const params = new URLSearchParams();
                 params.set('page', page);
@@ -440,7 +456,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 if(page === 'auth') params.set('auth_mode', authMode);
                 window.location.hash = params.toString();
              } catch(hashError) {
-                 console.error("Navigation failed:", hashError);
+                 // Explicitly ignore errors here to prevent console noise in restricted sandboxes
+                 // The app state is already updated, so the user sees the new page anyway
              }
         }
 
